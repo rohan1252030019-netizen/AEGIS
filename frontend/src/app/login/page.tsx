@@ -120,8 +120,12 @@ function LoginCard() {
       const result = await api.auth.loginCredentials(email.trim(), password);
       if (result?.token) setJwtToken(result.token);
       router.replace(nextParam);
-    } catch {
-      setError('Invalid email or password');
+    } catch (err: unknown) {
+      if (err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('NetworkError'))) {
+        setError('Cannot connect to backend at http://localhost:8000. Ensure uvicorn is running.');
+      } else {
+        setError(err instanceof Error && err.message !== 'Failed to fetch' ? err.message : 'Invalid email or password');
+      }
       setBusy(false);
     }
   }

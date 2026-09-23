@@ -1,4 +1,5 @@
 import { createRequire } from 'module';
+import path from 'path';
 
 // v1.6.4.8: expose the real package version to the client so it can never be
 // hand-typed stale again (TopNav/CommandBar/JSON-LD previously hardcoded
@@ -12,6 +13,9 @@ const pkg = require('./package.json');
 const nextConfig = {
   env: {
     NEXT_PUBLIC_AEGIS_VERSION: pkg.version,
+  },
+  turbopack: {
+    root: path.resolve('.'),
   },
 };
 

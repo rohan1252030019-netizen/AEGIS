@@ -105,9 +105,9 @@ const HONEYPOT_TYPES: HoneypotType[] = [
 ];
 
 const SMART_HONEYPOT_TYPES: HoneypotType[] = [
-  { id: 'http-mimic', name: 'HTTP App Mimic', description: 'AI clones your real web app to create indistinguishable decoys', port: 8889, icon: Sparkles, premium: true },
-  { id: 'api-mimic', name: 'API Mimic', description: 'AI-generated API responses that mirror your real services', port: 9091, icon: Zap, premium: true },
-  { id: 'db-mimic', name: 'DB Mimic', description: 'AI-powered database that serves fake but realistic data', port: 3307, icon: Bug, premium: true },
+  { id: 'http-mimic', name: 'HTTP App Mimic', description: 'AI clones your real web app to create indistinguishable decoys', port: 8889, icon: Sparkles, premium: false },
+  { id: 'api-mimic', name: 'API Mimic', description: 'AI-generated API responses that mirror your real services', port: 9091, icon: Zap, premium: false },
+  { id: 'db-mimic', name: 'DB Mimic', description: 'AI-powered database that serves fake but realistic data', port: 3307, icon: Bug, premium: false },
 ];
 
 // Provider icon mapping (fallback to Cpu for unknown providers)
@@ -122,12 +122,12 @@ const PROVIDER_ICONS: Record<string, typeof Cpu> = {
 
 // Static fallback in case API is unreachable during setup
 const FALLBACK_PROVIDERS: { id: AIProvider; label: string; description: string; icon: typeof Cpu }[] = [
+  { id: 'ollama', label: 'Ollama (Local AI)', description: 'Self-hosted local models — 100% free & offline (No API Key)', icon: Server },
+  { id: 'skip', label: 'Skip for now', description: 'Configure AI later in settings', icon: ChevronRight },
   { id: 'inception', label: 'Inception (Mercury-2)', description: 'Diffusion LLM — fast, free 10M tokens', icon: Zap },
   { id: 'openrouter', label: 'OpenRouter', description: 'Access 100+ models via one API key', icon: Globe },
   { id: 'anthropic', label: 'Anthropic', description: 'Claude models directly', icon: Cpu },
   { id: 'openai', label: 'OpenAI', description: 'GPT-4, GPT-3.5 and more', icon: Cpu },
-  { id: 'ollama', label: 'Ollama', description: 'Self-hosted local models', icon: Server },
-  { id: 'skip', label: 'Skip for now', description: 'Configure AI later in settings', icon: ChevronRight },
 ];
 
 const ASSET_TYPES = [
@@ -236,7 +236,7 @@ export default function SetupWizard() {
     password: '',
     apiKey: '',
     loginMode: false,
-    aiProvider: 'inception',
+    aiProvider: 'ollama',
     aiProviderKey: '',
     ollamaUrl: 'http://localhost:11434',
     assetMode: 'auto',
@@ -1377,36 +1377,38 @@ export default function SetupWizard() {
                 })}
               </div>
 
-              {/* Smart Honeypots (Premium) */}
+              {/* Smart Honeypots */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-4 h-4 text-[var(--brand-accent)]" />
-                  <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Smart Honeypots</span>
-                  <span className="text-[10px] font-bold text-[var(--brand-accent)] bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 px-2 py-0.5 rounded-full">ENTERPRISE</span>
+                  <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Smart Honeypots (AI-Driven)</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {SMART_HONEYPOT_TYPES.map(hp => {
                     const Icon = hp.icon;
+                    const isSelected = state.selectedHoneypots.includes(hp.id);
                     return (
                       <button
                         key={hp.id}
-                        onClick={() => toggleHoneypot(hp.id, true)}
-                        title="Premium feature — upgrade required"
-                        aria-disabled="true"
-                        className="relative p-3 rounded-xl border border-white/[0.04] bg-white/[0.01] text-left transition-all duration-200 opacity-50 cursor-not-allowed hover:opacity-60 hover:border-[var(--brand-accent)]/20 grayscale"
+                        onClick={() => toggleHoneypot(hp.id)}
+                        className={`relative p-3 rounded-xl border text-left transition-all duration-200 ${
+                          isSelected
+                            ? 'border-[var(--brand-accent)]/30 bg-[var(--brand-accent)]/5'
+                            : 'border-white/[0.04] bg-white/[0.01] hover:border-white/[0.1] hover:bg-white/[0.02]'
+                        }`}
                       >
-                        <div className="absolute top-2 right-2 flex items-center gap-1">
-                          <Crown className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
-                          <Lock className="w-3 h-3 text-zinc-500" />
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-[var(--brand-accent)] flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-[#09090B]" />
+                          </div>
+                        )}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${
+                          isSelected ? 'bg-[var(--brand-accent)]/10' : 'bg-white/[0.02]'
+                        }`}>
+                          <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-[var(--brand-accent)]' : 'text-zinc-500'}`} />
                         </div>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 bg-white/[0.02]">
-                          <Icon className="w-3.5 h-3.5 text-zinc-600" />
-                        </div>
-                        <div className="text-xs font-medium text-zinc-400 mb-0.5">{hp.name}</div>
-                        <div className="text-[10px] text-zinc-600 leading-tight">{hp.description}</div>
-                        <div className="mt-2 text-[9px] font-semibold uppercase tracking-wider text-[var(--brand-accent)]/70">
-                          Upgrade required
-                        </div>
+                        <div className="text-xs font-medium text-white mb-0.5">{hp.name}</div>
+                        <div className="text-[10px] text-zinc-500 leading-tight">{hp.description}</div>
                       </button>
                     );
                   })}

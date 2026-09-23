@@ -4,14 +4,19 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Core
-    AEGIS_ENV: str = "production"
+    AEGIS_ENV: str = "development"
     AEGIS_SECRET_KEY: str = "aegis-dev-secret-key-change-in-production"
     # Read from .env via pydantic (os.environ does NOT carry .env values);
     # the boot guard and admin seed both read this field, not os.environ.
     AEGIS_ADMIN_PASSWORD: str = "changeme-on-first-login"
     AEGIS_API_PORT: int = 8000
 
-    # OpenRouter
+    # AI Mode & Local Ollama
+    AEGIS_AI_MODE: str = "local"
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3"
+
+    # OpenRouter (optional cloud fallback)
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     # OmniRoute self-hosted gateway (optional). When set, it becomes the
@@ -19,7 +24,7 @@ class Settings(BaseSettings):
     AEGIS_OMNIROUTE_URL: str = ""
 
     # Database (PostgreSQL only)
-    DATABASE_URL: str = "postgresql+asyncpg://cayde6:cayde6pass@localhost:5432/cayde6"
+    DATABASE_URL: str = "postgresql+asyncpg://aegis:aegis_secret@localhost:5432/aegis"
 
     # Redis / Event bus
     REDIS_URL: str = "redis://localhost:6379"
@@ -164,9 +169,12 @@ class Settings(BaseSettings):
     # CORS — comma-separated explicit allow-list. Wildcard ("*") is invalid
     # combined with allow_credentials=True and is never used here (P0-10).
     # Prod overrides via env with the real dashboard origin(s).
-    AEGIS_CORS_ORIGINS: str = "http://localhost:3007,http://127.0.0.1:3007"
+    AEGIS_CORS_ORIGINS: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:3007,http://127.0.0.1:3007"
+    )
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": [".env", "../.env"], "extra": "ignore"}
 
 
 settings = Settings()

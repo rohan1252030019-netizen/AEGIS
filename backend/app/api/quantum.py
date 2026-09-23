@@ -132,7 +132,7 @@ async def analyze_entropy(
         return {
             "overview": True,
             "description": "Renyi entropy analysis module",
-            "supported_orders": [0.5, 1.0, 2.0, float("inf")],
+            "supported_orders": [0.5, 1.0, 2.0, "inf"],  # float("inf") is not JSON-serializable
             "max_data_size_mb": 10,
             "capabilities": [
                 "entropy_analysis",

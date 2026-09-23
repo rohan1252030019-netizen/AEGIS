@@ -23,7 +23,7 @@ import httpx
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -333,7 +333,7 @@ async def firewall_stats(
     rules_result = await db.execute(
         select(
             func.count(FirewallRule.id).label("total"),
-            func.count(FirewallRule.id).filter(FirewallRule.enabled == True).label("enabled"),  # noqa: E712
+            func.coalesce(func.sum(case((FirewallRule.enabled == True, 1), else_=0)), 0).label("enabled"),  # noqa: E712
             func.coalesce(func.sum(FirewallRule.hits), 0).label("hits"),
         ).where(FirewallRule.client_id == auth.client_id)
     )

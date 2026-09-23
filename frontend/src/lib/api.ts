@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -190,7 +190,7 @@ export type AiMode = 'required' | 'optional' | 'disabled';
 
 export async function getAiMode(): Promise<AiMode> {
   try {
-    const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
     const res = await fetch(`${BASE}/health`, { cache: 'no-store' });
     if (!res.ok) return 'optional';
     const data = await res.json();
@@ -1014,8 +1014,8 @@ export const api = {
       request<Array<{ type: string; name: string; description: string }>>('/reports/types'),
     generate: (reportType: string) => {
       const apiUrl = typeof window !== 'undefined'
-        ? localStorage.getItem('aegis_api_url') || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
-        : 'http://localhost:8000/api/v1';
+        ? localStorage.getItem('aegis_api_url') || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1'
+        : 'http://127.0.0.1:8000/api/v1';
       const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aegis_api_key') || '' : '';
       const token = typeof window !== 'undefined' ? localStorage.getItem('aegis_token') || '' : '';
 

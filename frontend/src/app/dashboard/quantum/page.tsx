@@ -116,30 +116,6 @@ const FALLBACK_ASSESSMENTS: AlgorithmAssessment[] = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-// Check if an API error indicates an upgrade is required
-function isUpgradeRequired(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  // Check for 403 status with upgrade_required in body
-  if ('status' in err && (err as { status: number }).status === 403) {
-    try {
-      const msg = (err as { message?: string }).message || '';
-      const parsed = JSON.parse(msg);
-      return parsed.upgrade_required === true;
-    } catch {
-      // Body might contain "upgrade_required" as a string
-      return ((err as { message?: string }).message || '').includes('upgrade_required');
-    }
-  }
-  return false;
-}
-
-// Check if a successful response signals an upgrade is needed
-function responseNeedsUpgrade(data: unknown): boolean {
-  return !!data && typeof data === 'object' && 'upgrade_required' in data && (data as Record<string, unknown>).upgrade_required === true;
-}
-
-type GatedSection = 'timeline' | 'assessments' | 'entropy';
-
 export default function QuantumPage() {
   const [readiness, setReadiness] = useState<QuantumReadiness>(FALLBACK_READINESS);
   const [timeline, setTimeline] = useState<CryptoTimelineEntry[]>(FALLBACK_TIMELINE);
@@ -147,33 +123,23 @@ export default function QuantumPage() {
   const [entropy, setEntropy] = useState<EntropyResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingFallback, setUsingFallback] = useState(false);
-  const [gatedSections, setGatedSections] = useState<Set<GatedSection>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     let usedFallback = false;
-    const gated = new Set<GatedSection>();
 
-    // Readiness is available to all tiers
+    // Readiness
     try {
       const raw = await api.quantum.readiness() as Record<string, unknown>;
-      if (responseNeedsUpgrade(raw)) {
-        usedFallback = true;
-      } else {
-        const summary = (raw.summary || {}) as Record<string, unknown>;
-        setReadiness({
-          score: (raw.quantum_readiness_score ?? raw.score ?? 0) as number,
-          quantum_safe_count: (summary.quantum_safe ?? raw.quantum_safe_count ?? 0) as number,
-          total_assets: (summary.total_algorithms_tracked ?? raw.total_assets ?? 0) as number,
-          last_assessed: (raw.assessed_at ?? raw.last_assessed ?? null) as string | null,
-        });
-      }
-    } catch (err) {
+      const summary = (raw.summary || {}) as Record<string, unknown>;
+      setReadiness({
+        score: (raw.quantum_readiness_score ?? raw.score ?? 0) as number,
+        quantum_safe_count: (summary.quantum_safe ?? raw.quantum_safe_count ?? 0) as number,
+        total_assets: (summary.total_algorithms_tracked ?? raw.total_assets ?? 0) as number,
+        last_assessed: (raw.assessed_at ?? raw.last_assessed ?? null) as string | null,
+      });
+    } catch {
       usedFallback = true;
-      if (isUpgradeRequired(err)) {
-        // Readiness still shows fallback data, no gating needed
-      }
-      // Calculate readiness from fallback assessments
       const safeCount = FALLBACK_ASSESSMENTS.filter(a => a.status === 'safe').length;
       setReadiness({
         score: Math.round((safeCount / FALLBACK_ASSESSMENTS.length) * 100),
@@ -185,47 +151,27 @@ export default function QuantumPage() {
 
     try {
       const data = await api.quantum.timeline();
-      if (responseNeedsUpgrade(data)) {
-        gated.add('timeline');
-      } else {
-        setTimeline(data as CryptoTimelineEntry[]);
-      }
-    } catch (err) {
-      if (isUpgradeRequired(err)) {
-        gated.add('timeline');
-      }
+      setTimeline(data as CryptoTimelineEntry[]);
+    } catch {
       usedFallback = true;
     }
 
     try {
       const data = await api.quantum.assessAll();
-      if (responseNeedsUpgrade(data)) {
-        gated.add('assessments');
-      } else {
-        setAssessments(data as AlgorithmAssessment[]);
-      }
-    } catch (err) {
-      if (isUpgradeRequired(err)) {
-        gated.add('assessments');
-      }
+      setAssessments(data as AlgorithmAssessment[]);
+    } catch {
       usedFallback = true;
     }
 
     try {
       const data = await api.quantum.entropy('system_check');
-      if (responseNeedsUpgrade(data)) {
-        gated.add('entropy');
-      } else if (data && Array.isArray(data)) {
+      if (data && Array.isArray(data)) {
         setEntropy(data as EntropyResult[]);
       }
-    } catch (err) {
-      if (isUpgradeRequired(err)) {
-        gated.add('entropy');
-      }
+    } catch {
       // Entropy is optional
     }
 
-    setGatedSections(gated);
     setUsingFallback(usedFallback);
     setLoading(false);
   }, []);
@@ -325,11 +271,6 @@ export default function QuantumPage() {
             <h2 className="text-sm font-semibold text-muted-foreground tracking-wide uppercase mb-6">
               Crypto Vulnerability Timeline
             </h2>
-            {gatedSections.has('timeline') ? (
-              <UpgradeGateBanner
-                feature="Crypto Vulnerability Timeline"
-              />
-            ) : (
             <div className="space-y-2">
               {/* Year axis */}
               <div className="flex items-center ml-[140px] mb-4">
@@ -411,7 +352,6 @@ export default function QuantumPage() {
                 ))}
               </div>
             </div>
-            )}
           </div>
 
           {/* Algorithm Assessment Table */}
@@ -419,11 +359,6 @@ export default function QuantumPage() {
             <h2 className="text-sm font-semibold text-muted-foreground tracking-wide uppercase mb-4">
               Algorithm Assessment
             </h2>
-            {gatedSections.has('assessments') ? (
-              <UpgradeGateBanner
-                feature="Algorithm Assessment"
-              />
-            ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -478,20 +413,14 @@ export default function QuantumPage() {
                 </tbody>
               </table>
             </div>
-            )}
           </div>
 
           {/* Entropy Analysis */}
-          {(entropy.length > 0 || gatedSections.has('entropy')) && (
+          {entropy.length > 0 && (
             <div className="bg-card border border-border rounded-2xl p-6">
               <h2 className="text-sm font-semibold text-muted-foreground tracking-wide uppercase mb-4">
                 Entropy Analysis
               </h2>
-              {gatedSections.has('entropy') ? (
-                <UpgradeGateBanner
-                  feature="Advanced Entropy Analysis"
-                />
-              ) : (
               <div className="space-y-4">
                 {entropy.map((result, idx) => (
                   <div key={idx} className="bg-background rounded-xl p-4 border border-border">
@@ -539,28 +468,11 @@ export default function QuantumPage() {
                   </div>
                 ))}
               </div>
-              )}
             </div>
           )}
         </>
       )}
 
-    </div>
-  );
-}
-
-// ─── Feature Gate Banner ─────────────────────────────────────────────────────
-
-function UpgradeGateBanner({ feature }: { feature: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--brand)]/10 bg-[var(--brand)]/[0.03] p-6 flex flex-col items-center text-center">
-      <div className="w-10 h-10 rounded-xl bg-[var(--brand)]/10 border border-[var(--brand)]/20 flex items-center justify-center mb-3">
-        <Lock size={18} className="text-[var(--brand)]" />
-      </div>
-      <p className="text-sm font-medium text-foreground mb-1">Feature not available</p>
-      <p className="text-xs text-muted-foreground">
-        {feature} is not available with your current plan. Reference data is shown above.
-      </p>
     </div>
   );
 }
