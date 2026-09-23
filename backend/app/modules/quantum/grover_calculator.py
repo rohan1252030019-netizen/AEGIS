@@ -487,10 +487,13 @@ class GroverCalculator:
         """Calculate years to brute force a key of given bit strength."""
         if bits <= 0:
             return 0.0
+        if bits >= 100:
+            return 1e30
         ops = 2 ** bits
         ops_per_sec = self.quantum_ops_sec if quantum else self.classical_ops_sec
         seconds = ops / ops_per_sec
         years = seconds / SECONDS_PER_YEAR
-        if years > 1e30:
-            return float("inf")
+        if years >= 1e30:
+            return 1e30
         return round(years, 2) if years < 1e15 else float(years)
+

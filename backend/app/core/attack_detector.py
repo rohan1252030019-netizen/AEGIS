@@ -838,16 +838,10 @@ class AttackDetectorMiddleware(BaseHTTPMiddleware):
         if _is_safe_ip(ip):
             return await call_next(request)
 
-        # v1.6.4: Skip benign-UA bots entirely (crawlers / monitors with
-        # rotating IPs that publish stable UAs). Equivalent to a safelist
-        # bypass but matched by User-Agent instead of source IP.
+        # Fast scanner UA detection (exempt known benign crawlers from scanner false-positives)
         user_agent = request.headers.get("user-agent", "")
-        if user_agent and _check_benign_ua(user_agent):
-            _record_timing(time.perf_counter_ns() - t0)
-            return await call_next(request)
-
-        # ---- OPTIMIZATION 5: Scanner UA via frozenset (no regex) ----
-        if user_agent and _check_scanner_ua(user_agent):
+        is_benign_ua = bool(user_agent and _check_benign_ua(user_agent))
+        if user_agent and not is_benign_ua and _check_scanner_ua(user_agent):
             should_block = _record_attack(ip, "scanner")
             logger.warning(
                 f"[DETECT] scanner UA from {ip}: {user_agent[:80]}"

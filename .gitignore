@@ -121,3 +121,11 @@ pi-deploy/*
 !pi-deploy/newsyslog/
 !pi-deploy/utils/
 !pi-deploy/web-server-logger.py
+
+# Nested duplicate clone
+/AEGIS/
+
+# Large datasets & GeoIP databases (exceed GitHub limits)
+*.csv
+backend/app/data/*.csv
+backend/app/data/geoip/

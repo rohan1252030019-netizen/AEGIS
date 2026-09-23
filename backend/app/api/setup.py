@@ -35,10 +35,18 @@ router = APIRouter(prefix="/setup", tags=["setup"])
 
 
 # ---------------------------------------------------------------------------
-# In-memory scan store (background scans)
+# In-memory scan store (background scans, capped to prevent unbounded memory growth)
 # ---------------------------------------------------------------------------
 
+_MAX_BACKGROUND_SCANS = 100
 _background_scans: dict[str, dict] = {}
+
+
+def _prune_background_scans() -> None:
+    while len(_background_scans) > _MAX_BACKGROUND_SCANS:
+        oldest_key = next(iter(_background_scans))
+        _background_scans.pop(oldest_key, None)
+
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +215,7 @@ async def discover_services(
     for results.
     """
     scan_id = f"disc_{uuid.uuid4().hex[:12]}"
+    _prune_background_scans()
 
     _background_scans[scan_id] = {
         "scan_id": scan_id,

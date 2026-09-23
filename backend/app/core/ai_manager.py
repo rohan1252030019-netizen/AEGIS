@@ -467,6 +467,8 @@ def init_default_providers(
     gemini_api_key: str = "",
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta",
     omniroute_url: str = "",
+    ollama_base_url: str = "http://localhost:11434",
+    ai_mode: str = "local",
 ) -> AIManager:
     """Register the default set of providers using env-level keys.
 
@@ -488,7 +490,7 @@ def init_default_providers(
     # OpenAI (no env key by default)
     ai_manager.register_provider("openai", OpenAIProvider())
     # Ollama (local, no key needed)
-    ai_manager.register_provider("ollama", OllamaProvider())
+    ai_manager.register_provider("ollama", OllamaProvider(base_url=ollama_base_url))
     # Google Gemini (cheap+fast hot-path enrichment) — only if the provider
     # class is available in this build of ai_providers.
     if GeminiProvider is not None:
@@ -514,17 +516,16 @@ def init_default_providers(
         # override any task that was hard-pinned to another provider.
         ai_manager.task_routing = {k: "omniroute" for k in ai_manager.task_routing}
         ai_manager.task_routing["ip_threat_brief"] = "omniroute"
-        # Measured, not assumed: auto/best-reasoning and auto/cheap both resolve
-        # to the SAME upstream model on this gateway today (MiMo-v2.5), so
-        # asking for the "better" combo buys no quality — it only costs more on
-        # failure (33.2s vs 19.1s to the same error). Kept at auto/cheap until
-        # the gateway actually routes the reasoning combo somewhere stronger.
-        # Kept INSIDE the `if omniroute_url` block on purpose — a model default
-        # for a provider that was never registered is dead config.
         ai_manager.task_model_defaults.setdefault("ip_threat_brief", {})["omniroute"] = ["auto/cheap"]
 
-    # Set active provider precedence: OmniRoute → Inception → OpenRouter → Gemini
-    if omniroute_url:
+    # Set active provider precedence:
+    # If mode is local, force Ollama. Otherwise, check cloud providers.
+    if ai_mode == "local":
+        ai_manager.set_active_provider("ollama")
+        ai_manager.fallback_chain = ["ollama"]
+        ai_manager.task_routing = {k: "ollama" for k in ai_manager.task_routing}
+        ai_manager.task_routing["ip_threat_brief"] = "ollama"
+    elif omniroute_url:
         ai_manager.set_active_provider("omniroute")
     elif inception_api_key:
         ai_manager.set_active_provider("inception")
@@ -532,6 +533,8 @@ def init_default_providers(
         ai_manager.set_active_provider("openrouter")
     elif gemini_api_key:
         ai_manager.set_active_provider("gemini")
+    else:
+        ai_manager.set_active_provider("ollama")
 
     logger.info(
         f"AI Manager initialized with {len(ai_manager.providers)} providers. "

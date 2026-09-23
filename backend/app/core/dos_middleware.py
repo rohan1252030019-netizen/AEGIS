@@ -98,18 +98,19 @@ def _client_ip(request) -> str:
     """Derive the rate-accounting client IP.
 
     Trusts X-Forwarded-For ONLY when the direct socket peer is a configured
-    trusted proxy (localhost / Tailscale CGNAT by default). From any other peer
-    the real socket IP is used, so an attacker rotating XFF cannot dilute or
-    frame per-IP counters.
+    trusted proxy. Evaluates hops right-to-left to find the rightmost non-trusted
+    client IP, defeating client-forged XFF header spoofing.
     """
     peer = request.client.host if request.client else "unknown"
     if _is_trusted_proxy(peer):
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
-            # First hop is the original client.
-            first = forwarded.split(",")[0].strip()
-            if first:
-                return first
+            hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+            for hop in reversed(hops):
+                if not _is_trusted_proxy(hop):
+                    return hop
+            if hops:
+                return hops[0]
     return peer
 
 

@@ -4,28 +4,61 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_is_mysql = "mysql" in settings.DATABASE_URL
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.AEGIS_ENV == "development",
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True,
-    pool_recycle=300,
-)
+if _is_sqlite:
+    # SQLite does not support pool_size / max_overflow / pool_recycle.
+    from sqlalchemy.pool import StaticPool
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.AEGIS_ENV == "development",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+elif _is_mysql:
+    # MySQL / aiomysql — pool_pre_ping keeps connections alive,
+    # pool_recycle prevents "server has gone away" on idle connections.
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.AEGIS_ENV == "development",
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=1800,
+    )
+else:
+    # PostgreSQL (asyncpg)
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.AEGIS_ENV == "development",
+        pool_size=20,
+        max_overflow=10,
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def init_db():
     """Run on startup to verify database connectivity and log configuration."""
-    logger.info(f"Database URL: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else settings.DATABASE_URL}")
-    logger.info("PostgreSQL: pool_size=20, max_overflow=10, pool_pre_ping=True")
+    db_display = settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else settings.DATABASE_URL
+    logger.info(f"Database URL: {db_display}")
 
     async with engine.begin() as conn:
-        result = await conn.exec_driver_sql("SELECT version()")
-        version = result.scalar()
-        logger.info(f"PostgreSQL version: {version}")
+        if _is_sqlite:
+            result = await conn.exec_driver_sql("SELECT sqlite_version()")
+            version = result.scalar()
+            logger.info(f"SQLite version: {version}")
+        elif _is_mysql:
+            result = await conn.exec_driver_sql("SELECT VERSION()")
+            version = result.scalar()
+            logger.info(f"MySQL version: {version}")
+        else:
+            result = await conn.exec_driver_sql("SELECT version()")
+            version = result.scalar()
+            logger.info(f"PostgreSQL version: {version}")
 
 
 async def get_db() -> AsyncSession:

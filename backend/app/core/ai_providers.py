@@ -526,7 +526,7 @@ class OllamaProvider(AIProvider):
         temperature: float = 0.3,
         max_tokens: int = 4096,
     ) -> dict:
-        model = model or "llama3"
+        model = model or os.getenv("OLLAMA_MODEL", "llama3")
         client = await self._get_client()
         start = time.time()
 

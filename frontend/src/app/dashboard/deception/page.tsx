@@ -26,7 +26,6 @@ export default function DeceptionPage() {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [enterpriseGated, setEnterpriseGated] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -37,15 +36,9 @@ export default function DeceptionPage() {
       setCampaigns(c.status === 'fulfilled' ? c.value : []);
       setHits(h.status === 'fulfilled' ? h.value : []);
       if (c.status === 'rejected') {
-        const isGated =
-          c.reason instanceof ApiError && c.reason.status === 403;
-        if (isGated) {
-          setEnterpriseGated(true);
-        } else {
-          const msg =
-            c.reason instanceof Error ? c.reason.message : String(c.reason);
-          setError(msg);
-        }
+        const msg =
+          c.reason instanceof Error ? c.reason.message : String(c.reason);
+        setError(msg);
       }
     } finally {
       setLoading(false);
@@ -91,9 +84,6 @@ export default function DeceptionPage() {
           <h1 className="text-[22px] sm:text-[28px] font-bold text-foreground tracking-tight flex items-center gap-3">
             <Sparkles className="w-6 h-6 text-[var(--brand-accent)]" />
             Honey-AI Deception
-            <span className="text-[11px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] border border-[color-mix(in_oklab,var(--warning)_25%,transparent)] text-[var(--warning)]">
-              Enterprise
-            </span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1 hidden sm:block">
             Auto-generate massive fake infrastructure and track stolen bait
@@ -116,26 +106,7 @@ export default function DeceptionPage() {
         </div>
       )}
 
-      {enterpriseGated && (
-        <Panel variant="warning" padding="lg" as="div" className="text-center">
-          <Lock className="w-10 h-10 text-[var(--warning)] mx-auto mb-4" />
-          <h2 className="text-[16px] font-semibold text-[var(--warning)] mb-2">Honey-AI Deception</h2>
-          <p className="text-[13px] text-muted-foreground max-w-md mx-auto mb-4">
-            Active deception campaigns require AEGIS Enterprise tier. Contact sales for activation.
-          </p>
-          <a
-            href="mailto:sales@somoswilab.com?subject=AEGIS%20Deception%20Inquiry"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold border border-[color-mix(in_oklab,var(--warning)_35%,transparent)] text-[var(--warning)] hover:bg-[color-mix(in_oklab,var(--warning)_10%,transparent)] transition-colors"
-          >
-            Contact Sales
-          </a>
-        </Panel>
-      )}
-
-      {/* Summary stats — hidden when enterprise-gated (all zeros would be misleading) */}
-      {!enterpriseGated && (
+      {/* Summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           label="Active Campaigns"
@@ -151,10 +122,8 @@ export default function DeceptionPage() {
         />
         <StatCard label="Hits" value={hits.length} tone="danger" />
       </div>
-      )}
 
       {/* Campaign list */}
-      {!enterpriseGated && (
       <Panel>
         <div className="px-4 sm:px-6 py-4 border-b border-border">
           <span className="text-[14px] font-semibold text-foreground">
@@ -252,10 +221,9 @@ export default function DeceptionPage() {
           </div>
         )}
       </Panel>
-      )}
 
-      {/* Breadcrumb hits — only shown when not enterprise-gated */}
-      {!enterpriseGated && <BreadcrumbHits hits={hits} />}
+      {/* Breadcrumb hits */}
+      <BreadcrumbHits hits={hits} />
 
       {/* Builder modal */}
       <CampaignBuilder

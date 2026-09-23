@@ -1392,8 +1392,8 @@ export default function SettingsPage() {
               { icon: Flame, name: 'Ransomware Protection', desc: 'Canary files + entropy detection + process kill in <500ms. Auto-rollback via VSS (Windows) or Btrfs/LVM snapshots (Linux).', href: '/dashboard/response', color: 'var(--danger)', free: true },
               { icon: Radar, name: 'Antivirus Engine', desc: 'YARA + ClamAV signature scanning, hash reputation cache, encrypted quarantine. On-access + daily scheduled scans. Auto-updates from YARA-Forge.', href: '/dashboard/antivirus', color: 'var(--brand)', free: true },
               { icon: Shield, name: 'Configurable Firewall', desc: 'YAML rule engine with rate limiting, CIDR matching, UA regex. 6 default templates. Hot reload in <1s. Test rules with synthetic events.', href: '/dashboard/firewall', color: '#10B981', free: true },
-              { icon: Sparkles, name: 'Quantum Analytics', desc: 'Renyi entropy for C2 beacon detection, Grover calculator for post-quantum crypto assessment, adversarial ML poisoning detection.', href: '/dashboard/quantum', color: '#A78BFA', free: false },
-              { icon: Bot, name: 'Honey-AI Deception', desc: 'Deploy 50+ fake services with AI-generated content. 4 industry themes (fintech, healthcare, ecommerce, devops). Breadcrumb UUID tracking.', href: '/dashboard/deception', color: 'var(--brand-accent)', free: false },
+              { icon: Sparkles, name: 'Quantum Analytics', desc: 'Renyi entropy for C2 beacon detection, Grover calculator for post-quantum crypto assessment, adversarial ML poisoning detection.', href: '/dashboard/quantum', color: '#A78BFA', free: true },
+              { icon: Bot, name: 'Honey-AI Deception', desc: 'Deploy 50+ fake services with AI-generated content. 4 industry themes (fintech, healthcare, ecommerce, devops). Breadcrumb UUID tracking.', href: '/dashboard/deception', color: 'var(--brand-accent)', free: true },
               { icon: Shield, name: 'Counter-Attack AI', desc: 'Analyze attackers with uncensored AI model. Recon, intel lookup, deception, abuse reporting, tarpit. Fully autonomous.', href: '/dashboard/response', color: 'var(--danger)', free: true },
             ].map((m) => (
               <button
@@ -1410,7 +1410,6 @@ export default function SettingsPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[13px] font-medium text-foreground group-hover:text-[var(--brand)] transition-colors">{m.name}</span>
-                    {!m.free && <span className="text-[9px] font-bold text-[var(--brand-accent)] bg-[var(--brand-accent)]/10 px-1.5 py-0.5 rounded">ENTERPRISE</span>}
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">{m.desc}</p>
                 </div>

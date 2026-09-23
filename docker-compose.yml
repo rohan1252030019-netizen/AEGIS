@@ -1,8 +1,8 @@
 # ============================================================
-# AEGIS Autonomous Defense Platform — Docker Compose
+# AEGIS Autonomous Defense Platform â€” Docker Compose
 # ============================================================
 #
-# Quick start (no .env needed — sane defaults are built in):
+# Quick start (no .env needed â€” sane defaults are built in):
 #   docker compose up -d
 #
 # Full stack (with Redis for event bus + caching):
@@ -20,10 +20,11 @@
 #   NEXT_PUBLIC_API_URL  API URL the browser calls   (default: http://localhost:8000/api/v1)
 #   NEXT_PUBLIC_WS_URL   WebSocket URL for live data (default: ws://localhost:8000/ws)
 #   OLLAMA_BASE_URL      Ollama inference endpoint   (default: http://host.docker.internal:11434)
+#   OLLAMA_MODEL         Ollama model                (default: llama3)
+#   AEGIS_AI_MODE        AI Mode                     (default: local)
 #   AEGIS_PLATFORM       Platform hint for backend   (default: linux)
-#   OPENROUTER_API_KEY   OpenRouter key (AI features)(default: empty — AI features disabled)
 #   JWT_SECRET_KEY       Secret for JWT signing      (default: auto-generated at first run)
-#   AEGIS_MONGODB_URI    MongoDB Atlas connection    (default: empty — threat intel hub disabled)
+#   AEGIS_MONGODB_URI    MongoDB Atlas connection    (default: empty â€” threat intel hub disabled)
 #
 # WINDOWS / macOS NOTES:
 #   - Docker Desktop required
@@ -41,7 +42,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      # Database credentials — change POSTGRES_PASSWORD in production!
+      # Database credentials â€” change POSTGRES_PASSWORD in production!
       POSTGRES_DB: ${POSTGRES_DB:-aegis}
       POSTGRES_USER: ${POSTGRES_USER:-aegis}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aegis_secret}
@@ -111,23 +112,24 @@ services:
       # API accessible on host port 8000
       - "${AEGIS_API_PORT:-8000}:8000"
     environment:
-      # Database connection — built from compose service name "aegis-db"
+      # Database connection â€” built from compose service name "aegis-db"
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aegis}:${POSTGRES_PASSWORD:-aegis_secret}@aegis-db:5432/${POSTGRES_DB:-aegis}
-      # Redis connection — built from compose service name "aegis-redis"
+      # Redis connection â€” built from compose service name "aegis-redis"
       - REDIS_URL=redis://aegis-redis:6379
       # Platform hint (linux inside container)
       - AEGIS_PLATFORM=${AEGIS_PLATFORM:-linux}
       # Ollama for local AI inference (host.docker.internal reaches host machine)
+      - AEGIS_AI_MODE=${AEGIS_AI_MODE:-local}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      # OpenRouter API key for cloud AI (leave empty to disable)
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
       # JWT configuration
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-aegis-docker-jwt-secret-change-me}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-1440}
       # MongoDB Atlas for threat intel sharing (optional)
       - AEGIS_MONGODB_URI=${AEGIS_MONGODB_URI:-}
+      - AEGIS_SECRET_KEY=${AEGIS_SECRET_KEY}
+      - AEGIS_ADMIN_PASSWORD=${AEGIS_ADMIN_PASSWORD}
       # Use in-memory event bus when Redis is not available
       - USE_MEMORY_BUS=${USE_MEMORY_BUS:-false}
     volumes:

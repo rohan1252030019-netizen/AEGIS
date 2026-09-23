@@ -571,6 +571,8 @@ async def lifespan(app: FastAPI):
         gemini_api_key=settings.GEMINI_API_KEY,
         gemini_base_url=settings.GEMINI_BASE_URL,
         omniroute_url=settings.AEGIS_OMNIROUTE_URL,
+        ollama_base_url=settings.OLLAMA_BASE_URL,
+        ai_mode=settings.AEGIS_AI_MODE,
     )
     openrouter_client.bind_ai_manager(ai_manager)
     logger.info("Multi-provider AI manager initialized")
@@ -850,10 +852,30 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc):
+    from starlette.responses import JSONResponse
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "Not Found",
+            "requested_path": request.url.path,
+            "message": f"Route '{request.url.path}' was not found.",
+            "hint": "All AEGIS API endpoints are under '/api/v1'. You can explore and test all available endpoints at '/docs'.",
+            "docs_url": "/docs",
+            "health_url": "/health",
+        },
+    )
+
+
 # CORS
+_cors_origins = set([o.strip() for o in settings.AEGIS_CORS_ORIGINS.split(",") if o.strip()])
+_cors_origins.update(["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3007", "http://127.0.0.1:3007"])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.AEGIS_CORS_ORIGINS.split(",") if o.strip()],
+    allow_origins=list(_cors_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -953,7 +975,19 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_push_manager.disconnect(ws_client)
 
 
-# --- Health endpoint ---
+# --- Root & Health endpoints ---
+
+@app.get("/")
+async def root():
+    return {
+        "service": "AEGIS / Cayde-6 Defense Platform API",
+        "status": "online",
+        "version": "1.6.4.9",
+        "docs": "/docs",
+        "health": "/health",
+        "api_prefix": "/api/v1",
+    }
+
 
 @app.get("/health")
 async def health():
@@ -991,3 +1025,6 @@ async def pipeline_stats():
         "playbook": playbook_engine.stats(),
         "fast_triage": ai_engine.fast_triage_stats(),
     }
+
+
+# AEGIS API initialized

@@ -189,7 +189,7 @@ async def incidents_daily_counts(
     cutoff = (datetime.utcnow() - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
     rows = await db.execute(
         select(
-            func.date_trunc('day', Incident.detected_at).label('day'),
+            func.date(Incident.detected_at).label('day'),  # MySQL-compatible DATE()
             func.count(Incident.id).label('count'),
         )
         .where(
@@ -199,7 +199,11 @@ async def incidents_daily_counts(
         )
         .group_by('day')
     )
-    by_day = {r[0].date().isoformat(): int(r[1] or 0) for r in rows.all()}
+    # MySQL DATE() returns a date object directly; handle both date and datetime for safety
+    by_day = {
+        (r[0].isoformat() if hasattr(r[0], 'isoformat') else str(r[0])): int(r[1] or 0)
+        for r in rows.all()
+    }
     out = []
     for i in range(days):
         d = (cutoff + timedelta(days=i)).date()

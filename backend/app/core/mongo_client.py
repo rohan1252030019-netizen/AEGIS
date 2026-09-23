@@ -15,17 +15,24 @@ IMPORTANT: aegis_threats and external_feeds NEVER mix.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Any
 
-import certifi
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection, AsyncIOMotorDatabase
+try:
+    import certifi
+    from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection, AsyncIOMotorDatabase
+    MOTOR_AVAILABLE = True
+except ImportError:
+    AsyncIOMotorClient = None  # type: ignore
+    AsyncIOMotorCollection = None  # type: ignore
+    AsyncIOMotorDatabase = None  # type: ignore
+    MOTOR_AVAILABLE = False
 
 from app.config import settings
 
 logger = logging.getLogger("cayde6.mongo")
 
-_client: Optional[AsyncIOMotorClient] = None
-_db: Optional[AsyncIOMotorDatabase] = None
+_client: Optional[Any] = None
+_db: Optional[Any] = None
 
 DATABASE_NAME = "aegis_intel"
 
@@ -40,6 +47,10 @@ async def connect_mongo() -> bool:
 
     if not settings.AEGIS_MONGODB_URI:
         logger.info("AEGIS_MONGODB_URI not set - MongoDB disabled")
+        return False
+
+    if not MOTOR_AVAILABLE:
+        logger.warning("AEGIS_MONGODB_URI is set, but 'motor' is not installed. Run: pip install motor")
         return False
 
     try:
@@ -97,19 +108,19 @@ async def _ensure_indexes():
     logger.info("MongoDB indexes ensured (aegis_threats + external_feeds)")
 
 
-def get_mongo_db() -> Optional[AsyncIOMotorDatabase]:
+def get_mongo_db() -> Optional[Any]:
     """Get the aegis_intel database. Returns None if not connected."""
     return _db
 
 
-def get_aegis_collection() -> Optional[AsyncIOMotorCollection]:
+def get_aegis_collection() -> Optional[Any]:
     """Get the aegis_threats collection (own detections ONLY). Returns None if not connected."""
     if _db is None:
         return None
     return _db[AEGIS_THREATS_COLLECTION]
 
 
-def get_external_collection() -> Optional[AsyncIOMotorCollection]:
+def get_external_collection() -> Optional[Any]:
     """Get the external_feeds collection (third-party feeds ONLY). Returns None if not connected."""
     if _db is None:
         return None

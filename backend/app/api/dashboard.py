@@ -366,7 +366,7 @@ async def get_auth_attempts_monthly(
         func.lower(Incident.title).like("%brute%"),
     )
 
-    month_bucket = func.date_trunc("month", Incident.detected_at).label("month_bucket")
+    month_bucket = func.date_format(Incident.detected_at, '%Y-%m-01').label("month_bucket")
     result = await db.execute(
         select(
             month_bucket,
@@ -383,10 +383,12 @@ async def get_auth_attempts_monthly(
     )
 
     # Build a "YYYY-MM" → count lookup from DB rows.
+    # MySQL date_format returns a string like '2026-09-01'; slice to 'YYYY-MM'.
     db_counts: dict[str, int] = {}
     for row in result.all():
-        bucket: datetime = row[0]
-        db_counts[bucket.strftime("%Y-%m")] = int(row[1] or 0)
+        bucket = row[0]  # str '2026-09-01' from MySQL date_format
+        key = bucket[:7] if isinstance(bucket, str) else bucket.strftime("%Y-%m")
+        db_counts[key] = int(row[1] or 0)
 
     # Walk from cutoff month to current month, filling zeros for missing months.
     month_list: list[MonthCount] = []

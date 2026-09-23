@@ -57,3 +57,5 @@ PyYAML>=6.0
 
 # Honey-AI Deception — realistic fake data generation
 Faker>=24.0
+email-validator
+yara-python>=4.5.0
