@@ -72,6 +72,14 @@ _discovered_services: list[dict] = []
 _system_info: dict = {}
 _shutdown = asyncio.Event()
 
+_host_isolator = None
+if platform.system() == "Windows":
+    try:
+        from windows_isolation import WindowsHostIsolator
+        _host_isolator = WindowsHostIsolator()
+    except Exception as _iso_err:
+        log.warning("Could not initialize WindowsHostIsolator: %s", _iso_err)
+
 
 # ---------------------------------------------------------------------------
 # HTTP client
@@ -180,11 +188,21 @@ async def heartbeat_loop(client: httpx.AsyncClient):
     start_time = time.monotonic()
     while not _shutdown.is_set():
         try:
+            if _host_isolator:
+                if _host_isolator.check_watchdog_lease():
+                    await _enqueue(
+                        category="network",
+                        severity="info",
+                        title="Host Network Auto-Restored: Watchdog Lease Expired",
+                        details=_host_isolator.status.to_dict(),
+                    )
+
             payload = {
                 "agent_id": cfg.AGENT_ID,
                 "uptime_seconds": int(time.monotonic() - start_time),
                 "process_count": len(psutil.pids()),
                 "connection_count": len(psutil.net_connections(kind="inet")),
+                "isolation_state": _host_isolator.status.state if _host_isolator else "NORMAL",
             }
             resp = await client.post("/agents/heartbeat", json=payload)
             if resp.status_code == 200:
@@ -212,7 +230,40 @@ async def _handle_command(cmd: dict, client: httpx.AsyncClient):
     elif command == "update_config":
         params = cmd.get("params", {})
         log.info("Config update requested: %s", params)
-        # Could dynamically update intervals, paths, etc.
+    elif command in ("isolate", "isolate_host"):
+        params = cmd.get("params", {})
+        initiator = params.get("initiator", "server")
+        reason = params.get("reason", "Remote EDR Isolation")
+        lease_seconds = int(params.get("lease_seconds", 900))
+        if _host_isolator:
+            status = _host_isolator.isolate(
+                server_target=cfg.AEGIS_API_URL,
+                initiator=initiator,
+                reason=reason,
+                lease_seconds=lease_seconds,
+            )
+            await _enqueue(
+                category="network",
+                severity="critical" if status.state == "ISOLATED" else "high",
+                title=f"Host Network Isolation: {status.state}",
+                details=status.to_dict(),
+            )
+        else:
+            log.warning("Isolation command received on non-Windows or unconfigured endpoint.")
+    elif command in ("unisolate", "unisolate_host", "restore_network"):
+        params = cmd.get("params", {})
+        initiator = params.get("initiator", "server")
+        reason = params.get("reason", "Remote EDR Restore")
+        if _host_isolator:
+            status = _host_isolator.restore(initiator=initiator, reason=reason)
+            await _enqueue(
+                category="network",
+                severity="info",
+                title=f"Host Network Restored: {status.state}",
+                details=status.to_dict(),
+            )
+        else:
+            log.warning("Unisolate command received on non-Windows or unconfigured endpoint.")
     elif command == "restart":
         log.info("Restart requested. Exiting for supervisor to restart.")
         _shutdown.set()
@@ -561,17 +612,30 @@ def _start_fim_watcher() -> Optional[Observer]:
         expanded = os.path.expanduser(path)
         if os.path.exists(expanded):
             is_dir = os.path.isdir(expanded)
-            observer.schedule(handler, expanded, recursive=is_dir)
-            watched += 1
-            log.info("FIM watching: %s (recursive=%s)", expanded, is_dir)
+            if is_dir:
+                try:
+                    os.listdir(expanded)
+                except (PermissionError, OSError) as exc:
+                    log.warning("FIM skipping %s: %s (requires elevation)", expanded, exc)
+                    continue
+            try:
+                observer.schedule(handler, expanded, recursive=is_dir)
+                watched += 1
+                log.info("FIM watching: %s (recursive=%s)", expanded, is_dir)
+            except (PermissionError, OSError) as exc:
+                log.warning("FIM could not schedule %s: %s", expanded, exc)
 
     if watched == 0:
         log.warning("No FIM paths found to watch")
         return None
 
-    observer.start()
-    log.info("FIM observer started (%d paths)", watched)
-    return observer
+    try:
+        observer.start()
+        log.info("FIM observer started (%d paths)", watched)
+        return observer
+    except (PermissionError, OSError) as exc:
+        log.warning("FIM observer failed to start: %s", exc)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -894,6 +958,49 @@ async def windows_eventlog_monitor_loop():
 
         except Exception as exc:
             log.debug("Windows Event Log monitor error: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Windows Registry & Scheduled Tasks Persistence Monitor (FR-03)
+# ---------------------------------------------------------------------------
+async def persistence_monitor_loop():
+    """
+    Monitor Windows Registry autorun keys and Scheduled Tasks for suspicious persistence.
+    Scans HKCU and HKLM Run/RunOnce (including 32-bit Wow64 and 64-bit views),
+    detects new/changed entries with explainable risk scoring, and suppresses duplicates.
+    """
+    if platform.system() != "Windows":
+        return
+
+    try:
+        from persistence_monitor import PersistenceMonitor
+    except ImportError as err:
+        log.warning("persistence_monitor module unavailable: %s", err)
+        return
+
+    monitor = PersistenceMonitor()
+    log.info("Windows Persistence Monitor started (interval=%ds)", cfg.PERSISTENCE_INTERVAL)
+
+    while not _shutdown.is_set():
+        try:
+            loop = asyncio.get_event_loop()
+            changes = await loop.run_in_executor(None, monitor.check_for_changes)
+            events = monitor.generate_events(changes)
+            for ev in events:
+                await _enqueue(
+                    category=ev.get("category", "fim"),
+                    severity=ev.get("severity", "medium"),
+                    title=ev.get("title", "Persistence Event"),
+                    details=ev.get("details", {}),
+                )
+        except Exception as exc:
+            log.warning("Windows Persistence Monitor error: %s", exc)
+
+        try:
+            await asyncio.wait_for(_shutdown.wait(), timeout=cfg.PERSISTENCE_INTERVAL)
+            break
+        except asyncio.TimeoutError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -1292,10 +1399,13 @@ async def main(ipc: bool = False):
             asyncio.create_task(data_sharing_loop(client), name="data_sharing"),
         )
 
-    # Windows-only: Event Log monitor
+    # Windows-only: Event Log & Persistence monitors
     if platform.system() == "Windows":
         tasks.append(
             asyncio.create_task(windows_eventlog_monitor_loop(), name="win_eventlog"),
+        )
+        tasks.append(
+            asyncio.create_task(persistence_monitor_loop(), name="persistence_monitor"),
         )
 
     # IPC mode: listen for commands on stdin and forward events to stdout

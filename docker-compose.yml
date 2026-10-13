@@ -130,6 +130,8 @@ services:
       - AEGIS_MONGODB_URI=${AEGIS_MONGODB_URI:-}
       - AEGIS_SECRET_KEY=${AEGIS_SECRET_KEY}
       - AEGIS_ADMIN_PASSWORD=${AEGIS_ADMIN_PASSWORD}
+      # Allow the browser dashboard and Electron-hosted dashboard to call the API.
+      - AEGIS_CORS_ORIGINS=${AEGIS_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:3007,http://127.0.0.1:3007}
       # Use in-memory event bus when Redis is not available
       - USE_MEMORY_BUS=${USE_MEMORY_BUS:-false}
     volumes:

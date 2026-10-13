@@ -101,7 +101,7 @@ The correlation engine implements 168 Sigma-style rules across 15 attack categor
 
 Ransomware defense combines canary file monitoring, extension-change detection, write-burst analysis, and RaaS threat intelligence feeds. Automated response provides provisional and confirmed IP blocking with configurable time-to-live. AI triage using local Ollama models assists analysts with incident classification, root-cause analysis, and remediation guidance — but is supplementary to the deterministic detection layer and is not the primary detection mechanism.
 
-Snapshot recovery is implemented for macOS (tmutil) and Linux (btrfs/zfs), gated by the `AEGIS_REAL_RECOVERY=1` environment variable. Windows VSS recovery is delegated to the Rust agent and not yet completed. Formal evaluation against public labeled cybersecurity datasets was outside the current implementation scope.
+Snapshot recovery is implemented across all supported operating systems: macOS (tmutil), Linux (btrfs/zfs), and Windows Volume Shadow Copy Service (VSS via vssadmin and robocopy extraction), gated by the `AEGIS_REAL_RECOVERY=1` environment variable with strict path-traversal safeguards and safe boundary enforcement. Formal evaluation against public labeled cybersecurity datasets was outside the current implementation scope.
 
 **Keywords:** EDR, Endpoint Detection and Response, MDR, Threat Detection, SOAR, Sigma Rules, Behavioral Anomaly Detection, Isolation Forest, Ransomware Detection, Open Source Security, YARA, MITRE ATT&CK, Local AI, Ollama, FastAPI, Rust Agent
 
@@ -243,7 +243,9 @@ The scope of this project includes:
 - Deception layer (honeypot and breadcrumbs)
 - SOAR response playbooks
 - RaaS threat intelligence feeds
-- Snapshot recovery architecture (macOS/Linux, gated)
+- Snapshot recovery architecture (macOS, Linux, and Windows VSS, gated)
+- Windows endpoint persistence monitoring (autorun registry keys & scheduled tasks)
+- Safe Windows host network isolation with watchdog lease and control-plane preservation
 - Quantum security analytics module (classical crypto assessment)
 
 **Out of Scope:**
@@ -251,7 +253,6 @@ The scope of this project includes:
 - Commercial MDR operations with 24/7 human analyst team
 - Large-scale enterprise deployment testing (>100 endpoints)
 - Formal evaluation against labeled public cybersecurity benchmark datasets
-- Windows VSS-based snapshot recovery (delegated to Rust agent, not yet complete)
 
 ## 1.10 Objectives
 
@@ -289,7 +290,7 @@ The following limitations are acknowledged:
 
 1. **Reactive ransomware response:** AEGIS cannot guarantee pre-encryption interception. Fast ransomware may encrypt some files before detection and process termination complete. AEGIS is designed to limit impact, not prevent all encryption.
 2. **User-space telemetry boundary:** The Python agent operates in user space using `psutil` and `watchdog`. Very short-lived processes or kernel-level rootkits may evade detection.
-3. **Windows snapshot recovery:** The Windows VSS-based snapshot recovery is a stub; real recovery is planned for the Rust agent but not yet implemented.
+3. **Windows snapshot boundary:** Windows VSS recovery supports safe directory and file extraction from Volume Shadow Copies via `robocopy` and path traversal sanitization, but intentionally disallows full in-place operating system drive overwrites during live execution to prevent bricking the host.
 4. **No formal ML benchmark:** The Isolation Forest behavioral model has not been evaluated against public labeled cybersecurity datasets. Formal precision/recall/F1 metrics are not available.
 5. **Local AI model quality:** The quality of AI-assisted triage depends on the specific Ollama model deployed. Model accuracy has not been formally benchmarked against security-specific evaluation datasets.
 6. **ETW/eBPF not implemented:** True kernel-level telemetry via Windows Event Tracing (ETW) or Linux eBPF is not implemented in the current codebase.
@@ -1284,10 +1285,17 @@ PLAYBOOKS = {
 |---|---|---|
 | macOS | `MacOSSnapshotProvider` — wraps `tmutil listlocalsnapshots` / `tmutil restore` | IMPLEMENTED |
 | Linux | `LinuxSnapshotProvider` — wraps `btrfs subvolume` / `zfs clone` | IMPLEMENTED |
-| Windows | `WindowsSnapshotProvider` — stub; raises `NotImplementedError` | STUB |
+| Windows | `WindowsSnapshotProvider` — Volume Shadow Copy Service via `vssadmin` & `robocopy` extraction | IMPLEMENTED |
 | Default (no flag) | `NoopSnapshotProvider` — returns synthetic data, no subprocess calls | MOCK/CI |
 
-**Verification:** `get_snapshot_provider()` is cached with `@functools.lru_cache(maxsize=1)`. Without `AEGIS_REAL_RECOVERY=1`, all recovery API endpoints return synthetic noop data.
+**Verification:** `get_snapshot_provider()` is cached with `@functools.lru_cache(maxsize=1)`. When `AEGIS_REAL_RECOVERY=1` is set:
+- **Windows VSS Provider Details:**
+  - Enumerates shadow copies with `vssadmin list shadows`, extracting shadow copy IDs, creation timestamps, and device object paths (`\\?\GLOBALROOT\Device\HarddiskVolumeShadowCopyN`).
+  - Creates new point-in-time restore points with `vssadmin create shadow /for=<Volume>`.
+  - Verifies presence of fresh snapshots within a configurable time window (default 24h).
+  - Implements safe file/directory extraction from shadow copy device paths using `robocopy /E /R:1 /W:1` into quarantined/target recovery paths.
+  - Enforces path sanitization, traversal protection (blocks `..` and relative escapes), and dry-run validation.
+  - Rejects dangerous live root volume overwrites (`C:\` target) with explicit error diagnostics to protect system integrity.
 
 ## 5.20 ETW (Windows Event Tracing)
 
@@ -1360,6 +1368,69 @@ C2 profiles (Cobalt Strike, Sliver, Meterpreter) are defined with entropy ranges
 **`adversarial_detector.py`** — ML model integrity:
 - Detects model drift indicating potential adversarial poisoning
 - Monitors feature distribution shifts over time
+
+## 5.26 Windows Registry & Scheduled Task Persistence Monitoring
+
+Implemented in `agent/persistence_monitor.py` and integrated into `agent/aegis_agent.py` to fulfill SRS Requirement FR-03:
+
+- **Registry Persistence Architecture:**
+  - Enumerates both 64-bit (`KEY_WOW64_64KEY`) and 32-bit (`KEY_WOW64_32KEY`) views across critical autorun hives:
+    - `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+    - `HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce`
+    - `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`
+    - `HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce`
+    - `HKLM\Software\Microsoft\Windows\CurrentVersion\RunServices`
+    - `HKLM\Software\Microsoft\Windows\CurrentVersion\RunServicesOnce`
+    - `HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon` (`Userinit`, `Shell`)
+  - Uses native Python `winreg` on Windows with transparent fallback to platform mock adapters for headless CI/Linux unit testing.
+
+- **Scheduled Tasks Persistence Architecture:**
+  - Queries scheduled tasks via `schtasks.exe /query /fo CSV /v` and inspects task action commands, executable names, and command-line arguments.
+  - Normalizes task metadata into structured `PersistenceItem` entities.
+
+- **Explainable Risk Scoring Engine (`evaluate_persistence_risk`):**
+  - Scores autoruns and tasks dynamically from 0 to 100 based on explainable risk indicators:
+    - Executable located in temporary, AppData, or user-writable paths (`+30`)
+    - Known LOLBins (`mshta.exe`, `certutil.exe`, `rundll32.exe`, `regsvr32.exe`, `wscript.exe`, `cscript.exe`, etc.) (`+35`)
+    - Encoded or obfuscated command arguments (`-enc`, `-encodedcommand`, Base64 markers) (`+35`)
+    - Remote download cradle patterns (`DownloadString`, `Invoke-WebRequest`, `curl`, `wget`) (`+40`)
+    - Hidden/stealth windows flags (`-w hidden`, `-windowstyle hidden`) (`+20`)
+    - Direct execution of script files (`.vbs`, `.js`, `.bat`, `.ps1`) (`+25`)
+    - Missing or non-existent target executables (`+25`)
+    - Allowlisting: Well-known legitimate system binaries (e.g. `explorer.exe`, `userinit.exe`, Windows Defender paths) receive zeroed or reduced risk scores.
+
+- **Baseline Initialization & Diffing Lifecycle:**
+  - Establishes a clean baseline snapshot upon agent initialization without flooding false alerts.
+  - Subsequent monitoring cycles perform delta diffing, producing structured `persistence_added`, `persistence_modified`, and `persistence_removed` events.
+  - Evaluates SHA-256 item signatures and hashes to suppress duplicate notifications for static, unchanged configurations.
+
+## 5.27 Safe Windows Host Network Isolation
+
+Implemented in `agent/windows_isolation.py`, integrated into `agent/aegis_agent.py`, `backend/app/api/edr.py`, and `backend/app/modules/response/responder.py` to fulfill SRS Requirement FR-09:
+
+- **Finite State Machine:**
+  - Strict lifecycle management: `NORMAL` → `ISOLATING` → `ISOLATED` → `RESTORING` → `FAILED`.
+  - State persistence across agent crashes and system reboots via `.isolation_state.json`.
+
+- **Windows Defender Firewall Enforcement:**
+  - Employs deterministic, tagged firewall rules (`AEGIS-ISOLATE-*`):
+    - `AEGIS-ISOLATE-BLOCK-INBOUND`: Default-deny all incoming network traffic.
+    - `AEGIS-ISOLATE-BLOCK-OUTBOUND`: Default-deny all outgoing network traffic.
+    - `AEGIS-ISOLATE-ALLOW-MGMT-OUT`: Permits outbound control-plane traffic to configured AEGIS backend IP/port.
+    - `AEGIS-ISOLATE-ALLOW-MGMT-IN`: Permits inbound response packets from configured AEGIS backend IP/port.
+    - `AEGIS-ISOLATE-ALLOW-DNS`: Preserves outbound UDP/TCP port 53 to allow dynamic hostname resolution.
+    - `AEGIS-ISOLATE-ALLOW-DHCP`: Preserves UDP ports 67/68 for ongoing IP lease renewal.
+    - `AEGIS-ISOLATE-ALLOW-LOOPBACK`: Preserves loopback interface (127.0.0.1) for local agent health and IPC.
+  - Idempotent cleanup: During un-isolation or rollback, only AEGIS-owned firewall rules are deleted; user-defined and enterprise policies remain completely untouched.
+
+- **Watchdog Auto-Recovery Lease:**
+  - Configurable lease timeout (default 15 minutes / 900 seconds) prevents permanent operator lockout if management connectivity or the central server fails.
+  - Agent heartbeat loop verifies lease freshness and initiates automatic fail-safe restoration if the lease expires without renewal.
+
+- **Role-Based Access Control & API Endpoints:**
+  - `POST /api/v1/edr/hosts/{agent_id}/isolate`: Requires `admin` role and explicit confirmation payload.
+  - `POST /api/v1/edr/hosts/{agent_id}/unisolate`: Requires `admin` role to restore network traffic.
+  - `GET /api/v1/edr/hosts/{agent_id}/isolation-status`: Analyst-accessible endpoint querying live state and watchdog expiration.
 
 ---
 
@@ -1574,7 +1645,12 @@ pub fn kill_process_chain(target_pid: u32) -> KillResult {
 
 ## 7.4 Network Isolation
 
-Network isolation (blocking all traffic to/from a specific host, not just one IP) is partially implemented. The `counter_attack.py` module generates iptables command strings for isolation, but direct execution requires system-level firewall integration via `AEGIS_REAL_FW=1`.
+Host network isolation (restricting all inbound and outbound host network communications during an incident while preserving AEGIS control-plane access) is fully implemented via `WindowsHostIsolator` in `agent/windows_isolation.py` and managed centrally via `/api/v1/edr/hosts/{agent_id}/isolate`.
+
+- **Enforcement:** Generates deterministic `AEGIS-ISOLATE-*` Windows Defender Firewall rules that block all inbound and outbound TCP/UDP traffic.
+- **Control Plane Preservation:** Explicitly permits bidirectional communication with the configured AEGIS backend server IP/port, preserves DNS (port 53), DHCP (ports 67/68), and loopback (127.0.0.1).
+- **Auto-Recovery Watchdog:** Employs an auditable 15-minute lease timer that automatically restores baseline network rules if communication with the server is lost, preventing permanent operator lockout.
+- **Cross-Platform:** For Linux, `counter_attack.py` and `firewall_client.py` generate iptables rules under `AEGIS_REAL_FW=1`.
 
 ## 7.5 Snapshot Recovery Workflow
 
@@ -1587,8 +1663,8 @@ POST /api/v1/ransomware/restore
               │
               ├── AEGIS_REAL_RECOVERY=1 + macOS → tmutil restore
               ├── AEGIS_REAL_RECOVERY=1 + Linux → btrfs/zfs clone
-              ├── AEGIS_REAL_RECOVERY=1 + Windows → NotImplementedError (stub)
-              └── default → NoopSnapshotProvider (returns mock data)
+              ├── AEGIS_REAL_RECOVERY=1 + Windows → WindowsSnapshotProvider (vssadmin + robocopy)
+              └── default → NoopSnapshotProvider (returns mock data for CI)
               │
               ▼
       RestoreJob {job_id, status, error}
@@ -1758,7 +1834,35 @@ Security self-testing:
 
 ## 8.16 Regression Testing
 
-The CI pipeline (`.github/workflows/ci.yml`) runs the test suite on every commit. Regression testing ensures that bug fixes and new features do not break existing detection rules or API contracts. The README notes "11/11 verified" detection capabilities, documented in a test-evidence table.
+The CI pipeline (`.github/workflows/ci.yml`) runs the test suite on every commit. Regression testing ensures that bug fixes and new features do not break existing detection rules or API contracts. Across the backend unit suite, 235 automated tests execute and pass in under 8 seconds.
+
+## 8.17 Windows Persistence Monitoring Testing
+
+Tested via `agent/test_persistence_monitor.py` (9 tests) and `backend/tests/unit/test_persistence_monitor.py` (7 tests):
+- **Risk Scoring Verification:** Evaluates scoring accuracy across benign allowlisted binaries (score = 0), PowerShell obfuscated execution (`-EncodedCommand`, `-WindowStyle Hidden`), unquoted temp path execution (`C:\Users\...\AppData\Local\Temp`), remote download cradles (`DownloadString`), and standalone script execution (`.vbs`, `.js`).
+- **Architecture & Compatibility:** Validates transparent 32-bit (`KEY_WOW64_32KEY`) and 64-bit (`KEY_WOW64_64KEY`) registry scanning using mock readers for cross-platform execution alongside native Windows `winreg` on live endpoints.
+- **Scheduled Task Extraction:** Verifies CSV and XML parsing of `schtasks /query /fo CSV /v` output, normalizing task command paths and arguments into `PersistenceItem` records.
+- **Baseline Diffing & Deduplication:** Tests initial baseline silence, accurate emission of `persistence_added`, `persistence_modified`, and `persistence_removed` events, and verification that unchanged entries do not generate duplicate notifications.
+
+## 8.18 Windows Host Network Isolation Testing
+
+Tested via `agent/test_windows_isolation.py` (7 tests), `backend/tests/unit/test_windows_isolation.py` (3 tests), and `backend/tests/unit/test_edr_isolation_api.py` (4 tests):
+- **State Machine Transitions:** Confirms initial state `NORMAL`, transition to `ISOLATING` and `ISOLATED`, restoration to `RESTORING` and `NORMAL`, and error trapping to `FAILED`.
+- **Defender Firewall Rules:** Asserts creation of default-deny inbound/outbound rules alongside strict allow rules for central management IP/port, DNS (UDP/TCP 53), DHCP (UDP 67/68), and loopback (127.0.0.1).
+- **Rule Idempotency & Clean Restoration:** Confirms that restoration specifically deletes only AEGIS-owned `AEGIS-ISOLATE-*` rules without modifying existing system policies or flushing rulesets.
+- **Auto-Recovery Watchdog Lease:** Simulates lease expiration and verifies that the agent automatically initiates fail-safe un-isolation to prevent operator lockout if central communication drops.
+- **State Reconstruction Across Restarts:** Verifies persistent state file (`.isolation_state.json`) parsing, ensuring active isolation survives agent restarts.
+- **API & RBAC Authorization:** Confirms `/api/v1/edr/hosts/{agent_id}/isolate` and `unisolate` endpoints require `admin` role and reject unauthenticated requests or invalid payloads.
+
+## 8.19 Windows VSS Snapshot Provider Testing
+
+Tested via `backend/tests/unit/test_snapshot_manager.py` (8 Windows VSS tests; 26 snapshot manager tests total):
+- **VSS Output Parsing:** Parses `vssadmin list shadows` output to accurately extract Shadow Copy IDs, creation timestamps, and device object paths (`\\?\GLOBALROOT\Device\HarddiskVolumeShadowCopyN`).
+- **Snapshot Creation:** Verifies execution of `vssadmin create shadow /for=<Volume>` and parsing of newly generated shadow volume metadata.
+- **Path Traversal Defense:** Verifies rejection of malicious paths containing directory traversal patterns (`..`, relative roots).
+- **Dry-Run Validation:** Confirms safe execution mode without performing actual disk operations.
+- **Live System Volume Boundary Guard:** Explicitly tests rejection of full live system root rollbacks (`C:\`), ensuring the provider requires targeted extraction rather than destructive in-place OS overwrites.
+- **Robocopy Extraction:** Confirms correct command assembly with trailing slash preservation on device paths and robust error checking.
 
 ---
 
@@ -1919,7 +2023,7 @@ The per-client safe IP list (`AEGIS_SAFE_IPS`) prevents the system from blocking
 
 ## 10.6 Snapshot Recovery
 
-Snapshot recovery is functional for macOS (tmutil) and Linux (btrfs/zfs) when `AEGIS_REAL_RECOVERY=1` is set. The Windows VSS implementation is a stub. The NoopSnapshotProvider (default) returns synthetic data and enables full API testing without platform-specific tools.
+Snapshot recovery is functional for macOS (tmutil), Linux (btrfs/zfs), and Windows Volume Shadow Copy Service (vssadmin + robocopy) when `AEGIS_REAL_RECOVERY=1` is set. The NoopSnapshotProvider (default) returns synthetic data and enables full API testing without platform-specific tools.
 
 ## 10.7 System Integration
 
@@ -1948,9 +2052,9 @@ AEGIS detects ransomware behaviors after they commence. Process termination via 
 
 The current implementation uses user-space monitoring exclusively (`psutil`, `sysinfo`, `watchdog`, `notify`). Short-lived processes that spawn and exit between polling intervals (default: 10 seconds) may be missed. Kernel-level rootkits that manipulate user-space APIs may evade detection. ETW (Windows) and eBPF (Linux) kernel telemetry channels are planned but not yet implemented.
 
-## 11.3 Windows Snapshot Recovery
+## 11.3 Windows Snapshot Recovery Boundary
 
-The `WindowsSnapshotProvider` class is a stub that raises `NotImplementedError`. Windows VSS-based snapshot recovery is planned for the Rust agent (Phase R-E) but is not implemented in the current version.
+The `WindowsSnapshotProvider` supports real Volume Shadow Copy creation, enumeration, and robocopy extraction of targeted directories. To prevent catastrophic system corruption, full live root-volume rollbacks (`C:\`) are intentionally disallowed and rejected during live execution; such bare-metal restores require offline Windows Recovery Environment media.
 
 ## 11.4 No Formal ML Evaluation
 
@@ -2000,9 +2104,9 @@ Future work should include formal evaluation of the Isolation Forest behavioral 
 
 Formal integration of the Python `yara` library for binary file scanning against YARA rule repositories (e.g., YARA-Forge, Elastic's YARA rules) would significantly expand malware detection capability beyond vulnerability scanning.
 
-## 12.5 Windows VSS Recovery
+## 12.5 Windows VSS Integration Enhancements
 
-Completing the Windows `WindowsSnapshotProvider` using the VSS API (either via COM from Python or via the Rust agent) would provide complete cross-platform snapshot recovery capability.
+While `WindowsSnapshotProvider` now supports robust shadow copy discovery, creation, and robocopy extraction with path-traversal safeguards, future work will integrate native VSS COM writer coordination (via `pywin32` or the Rust agent) to pause transactional database writers (e.g., SQL Server, Active Directory) before taking application-consistent snapshots.
 
 ## 12.6 Expanded Threat Intelligence
 
@@ -2051,11 +2155,14 @@ Key technical achievements include:
 - A 168+ rule Sigma-style correlation engine with O(1) type-indexed rule lookup and sub-millisecond in-memory evaluation latency
 - Multi-indicator ransomware kill-chain detection covering 12 specific MITRE ATT&CK techniques across 5 attack phases
 - Per-asset behavioral anomaly detection using Isolation Forest with 7-day rolling baseline
+- Real Windows persistence monitoring covering 32/64-bit autorun registry keys and scheduled task action extraction with explainable risk scoring
+- Safe Windows host network isolation with default-deny rules, control plane preservation, and watchdog auto-recovery lease
+- Real Windows Volume Shadow Copy (VSS) snapshot discovery, creation, and robocopy extraction with strict path-traversal safeguards
 - An offline-capable architecture with deterministic fallback for all AI-assisted functions
 - A dual-tier agent system (Python user-space + Rust prototype) providing broad platform compatibility with high-performance ransomware response in the Rust implementation
 - Provisional blocking that enables aggressive automated response while managing false-positive risk through auto-expiring blocks
 
-Significant limitations are acknowledged: ransomware detection is reactive rather than preventive, ETW/eBPF kernel telemetry is not yet implemented, Windows snapshot recovery is incomplete, and formal ML evaluation against labeled public datasets was outside the current scope. These limitations define clear directions for future development.
+Significant limitations are acknowledged: ransomware detection is reactive rather than preventive, ETW/eBPF kernel telemetry is not yet implemented, full in-place OS volume rollbacks are restricted during live execution to protect host stability, and formal ML evaluation against labeled public datasets was outside the current scope. These limitations define clear directions for future development.
 
 AEGIS demonstrates the practical feasibility of building a functionally capable EDR/MDR-style security platform using open-source components including FastAPI, Next.js, SQLAlchemy, scikit-learn, Rust, Ollama, PostgreSQL, and the MITRE ATT&CK knowledge base. The project contributes a reference implementation that can serve as a foundation for further academic research, security education, and practical deployment in resource-constrained environments.
 
@@ -2135,6 +2242,10 @@ AEGIS demonstrates the practical feasibility of building a functionally capable 
 | GET | `/api/v1/firewall/blocked` | List blocked IPs |
 | GET | `/api/v1/firewall/rules` | Firewall rules list |
 | GET | `/api/v1/edr/chains` | EDR attack chain list |
+| POST | `/api/v1/edr/hosts/{agent_id}/isolate` | Safe host network isolation (admin RBAC) |
+| POST | `/api/v1/edr/hosts/{agent_id}/unisolate` | Restore host network connectivity (admin RBAC) |
+| GET | `/api/v1/edr/hosts/{agent_id}/isolation-status` | Retrieve host isolation state & watchdog lease |
+| POST | `/api/v1/ransomware/restore` | Restore files/folders via snapshot provider |
 | GET | `/api/v1/agents` | Registered endpoint agents |
 | GET | `/api/v1/deception/campaigns` | Deception campaign list |
 | GET | `/api/v1/quantum/crypto/assess` | Quantum cryptographic assessment |

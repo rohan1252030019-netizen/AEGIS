@@ -997,6 +997,9 @@ async def get_monitored_apps(
     # v1.6.3.10: bound to 90d window. Older incidents are operationally noise
     # and the unbounded scan over a growing table was the second slowest
     # contributor after PM2 jlist.
+    if not app_names:
+        return {"apps": [], "count": 0}
+
     cutoff_90d = datetime.utcnow() - timedelta(days=90)
     agg_rows = await db.execute(
         select(
@@ -1007,7 +1010,7 @@ async def get_monitored_apps(
         )
         .where(
             Incident.client_id == client.id,
-            Incident.source.in_(app_names) if app_names else func.false(),
+            Incident.source.in_(app_names),
             Incident.detected_at >= cutoff_90d,
         )
         .group_by(Incident.source, Incident.status)
