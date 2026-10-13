@@ -228,33 +228,124 @@ class TestLinuxSnapshotProvider:
 
 
 # ---------------------------------------------------------------------------
-# WindowsSnapshotProvider — stub
+# WindowsSnapshotProvider — Real VSS tests (FR-09)
 # ---------------------------------------------------------------------------
+
+SAMPLE_VSS_OUTPUT = b"""
+vssadmin 1.1 - Volume Shadow Copy Service administrative command-line tool
+(C) Copyright 2001-2013 Microsoft Corp.
+
+Contents of shadow copy set ID: {3b644458-7ca8-472d-862d-0b63b2a2ddc0}
+   Contained 1 shadow copies at creation time: 10/12/2026 14:30:15
+      Shadow Copy ID: {b8e8f81e-45fa-4c48-8df0-e889a77b8b73}
+         Original Volume: (C:)\\\\?\\Volume{7e0ddf18-0000-0000-0000-100000000000}\\
+         Shadow Copy Volume: \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy1
+         Originating Machine: WIN-ENDPOINT-01
+         Service Machine: WIN-ENDPOINT-01
+         Provider: 'Microsoft Software Shadow Copy provider 1.0'
+         Type: ClientAccessible
+         Attributes: Differential, Auto_Release
+"""
+
 
 class TestWindowsSnapshotProvider:
     def setup_method(self):
         self.m = _reload_module(real_recovery="1")
         self.provider = self.m.WindowsSnapshotProvider()
 
-    def test_list_snapshots_raises_or_returns_not_supported(self):
-        """Windows stub must either raise NotImplementedError or return sentinel."""
-        try:
-            result = self.provider.list_snapshots("host")
-            # If it doesn't raise, it must return a sentinel indicating not supported
-            assert result == [] or (isinstance(result, list) and len(result) == 0)
-        except NotImplementedError:
-            pass  # acceptable
+    def test_list_snapshots_parses_vss_output(self):
+        with patch("subprocess.run", return_value=_make_proc(returncode=0, stdout=SAMPLE_VSS_OUTPUT)) as mock_run:
+            snaps = self.provider.list_snapshots("win-host-1")
 
-    def test_verify_recent_raises_or_returns_false(self):
-        try:
-            result = self.provider.verify_recent("host")
-            assert result is False
-        except NotImplementedError:
-            pass
+        mock_run.assert_called_once()
+        argv = mock_run.call_args[0][0]
+        assert argv == ["vssadmin", "list", "shadows"]
+        assert len(snaps) == 1
+        snap = snaps[0]
+        assert snap.id == "{b8e8f81e-45fa-4c48-8df0-e889a77b8b73}"
+        assert snap.provider == "vss"
+        assert "HarddiskVolumeShadowCopy1" in (snap.label or "")
 
-    def test_restore_raises_not_implemented(self):
-        with pytest.raises(NotImplementedError):
-            self.provider.restore("host", "snap-1", "C:\\restore")
+    def test_verify_recent_true_when_fresh_snapshot(self):
+        with patch("subprocess.run", return_value=_make_proc(returncode=0, stdout=SAMPLE_VSS_OUTPUT)):
+            # With _MAX_SNAPSHOT_AGE_HOURS mocked or fresh timestamp
+            with patch.object(self.m.Snapshot, "age_hours", return_value=5.0):
+                result = self.provider.verify_recent("win-host-1")
+        assert result is True
+
+    def test_verify_recent_false_when_empty_output(self):
+        with patch("subprocess.run", return_value=_make_proc(returncode=0, stdout=b"No items found that satisfy the query.")):
+            result = self.provider.verify_recent("win-host-1")
+        assert result is False
+
+    def test_create_snapshot_happy_path(self):
+        create_output = (
+            b"Successfully created shadow copy for 'C:'\n"
+            b"    Shadow Copy ID: {b8e8f81e-45fa-4c48-8df0-e889a77b8b73}\n"
+            b"    Shadow Copy Volume Name: \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy2\n"
+        )
+        with patch("subprocess.run", return_value=_make_proc(returncode=0, stdout=create_output)) as mock_run:
+            snap = self.provider.create_snapshot("C:")
+
+        mock_run.assert_called_once()
+        argv = mock_run.call_args[0][0]
+        assert argv[0] == "vssadmin"
+        assert "create" in argv
+        assert snap.id == "{b8e8f81e-45fa-4c48-8df0-e889a77b8b73}"
+
+    def test_restore_boundary_rejection_live_root(self):
+        """Live full-system volume rollback must be rejected with explicit guidance."""
+        for root_path in ["C:", "C:\\", "/", ""]:
+            job = self.provider.restore("win-host-1", "{b8e8f81e-45fa-4c48-8df0-e889a77b8b73}", root_path)
+            assert job.status == "failed"
+            assert "Live full-system volume rollback is not supported online" in (job.error or "")
+
+    def test_restore_path_traversal_protection(self):
+        """Restoring into Windows system root directory must be rejected."""
+        with patch.dict(os.environ, {"SystemRoot": r"C:\Windows"}):
+            job = self.provider.restore(
+                "win-host-1",
+                "{b8e8f81e-45fa-4c48-8df0-e889a77b8b73}",
+                r"C:\Windows\System32\drivers",
+            )
+            assert job.status == "failed"
+            assert "Invalid target path" in (job.error or "")
+
+    def test_restore_dry_run_validation(self):
+        """Dry-run validates paths and returns completed without writing."""
+        with patch("subprocess.run") as mock_run:
+            job = self.provider.restore(
+                "win-host-1",
+                "{b8e8f81e-45fa-4c48-8df0-e889a77b8b73}",
+                r"C:\SafeRestore\Target",
+                dry_run=True,
+            )
+        assert job.status == "completed"
+        assert job.error is None
+        # In dry run, robocopy is NOT called
+        mock_run.assert_not_called()
+
+    def test_restore_happy_path_robocopy(self):
+        """Restoration queries shadow device and executes robocopy safely."""
+        with patch("subprocess.run") as mock_run, patch("pathlib.Path.mkdir"):
+            # 1st call: list shadows -> returns shadow volume device
+            # 2nd call: robocopy -> returncode 1 (successful copy)
+            mock_run.side_effect = [
+                _make_proc(returncode=0, stdout=SAMPLE_VSS_OUTPUT),
+                _make_proc(returncode=1, stdout=b"Files copied: 10"),
+            ]
+            job = self.provider.restore(
+                "win-host-1",
+                "{b8e8f81e-45fa-4c48-8df0-e889a77b8b73}",
+                r"C:\SafeRestore\Target",
+                dry_run=False,
+            )
+
+        assert job.status == "completed"
+        assert mock_run.call_count == 2
+        robocopy_argv = mock_run.call_args_list[1][0][0]
+        assert robocopy_argv[0] == "robocopy"
+        assert "HarddiskVolumeShadowCopy1" in robocopy_argv[1]
 
 
 # ---------------------------------------------------------------------------

@@ -197,13 +197,62 @@ class ActiveResponder:
         return {"success": True, "action": "remove_firewall_rule", "target": target}
 
     async def _isolate_host(self, target: str, params: dict) -> dict:
-        logger.info("RESPONSE: isolate_host requested for %s (not implemented)", target)
-        return {"success": False, "status": "not_implemented",
-                "action": "isolate_host", "target": target,
-                "detail": "This response action is not yet implemented; no system change was made."}
+        import re
+        # Host isolation requires a managed agent endpoint. For arbitrary remote IPs,
+        # remote host isolation cannot be enforced (block_ip should be used).
+        if not target or (re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", target) and not (params or {}).get("agent_id")):
+            logger.info("RESPONSE: isolate_host requested for unmanaged IP %s (not implemented as host agent)", target)
+            return {
+                "success": False,
+                "status": "not_implemented",
+                "action": "isolate_host",
+                "target": target,
+                "detail": "Host isolation is not implemented for unmanaged remote IP targets; target a managed agent ID.",
+            }
+
+        logger.info("RESPONSE: Executing isolate_host for managed agent target=%s", target)
+        try:
+            from app.api.agents import _enqueue_command
+            _enqueue_command(target, {
+                "command": "isolate_host",
+                "params": {
+                    "initiator": "active_responder",
+                    "reason": (params or {}).get("reason", "Autonomous playbook containment"),
+                    "lease_seconds": (params or {}).get("lease_seconds", 900),
+                },
+            })
+            return {
+                "success": True,
+                "action": "isolate_host",
+                "target": target,
+                "status": "command_queued",
+                "detail": f"Host isolation command dispatched to endpoint agent {target}",
+            }
+        except Exception as e:
+            logger.error("RESPONSE: isolate_host failed for %s: %s", target, e)
+            return {"success": False, "action": "isolate_host", "target": target, "error": str(e)}
 
     async def _unisolate_host(self, target: str, params: dict) -> dict:
-        return {"success": True, "action": "unisolate_host", "target": target}
+        logger.info("RESPONSE: Executing unisolate_host for target=%s", target)
+        try:
+            from app.api.agents import _enqueue_command
+            _enqueue_command(target, {
+                "command": "unisolate_host",
+                "params": {
+                    "initiator": "active_responder",
+                    "reason": (params or {}).get("reason", "Rollback/Restoration"),
+                },
+            })
+            return {
+                "success": True,
+                "action": "unisolate_host",
+                "target": target,
+                "status": "command_queued",
+                "detail": f"Host restoration command dispatched to endpoint agent {target}",
+            }
+        except Exception as e:
+            logger.error("RESPONSE: unisolate_host failed for %s: %s", target, e)
+            return {"success": False, "action": "unisolate_host", "target": target, "error": str(e)}
 
     async def _kill_process(self, target: str, params: dict) -> dict:
         logger.info("RESPONSE: kill_process requested for %s (not implemented)", target)

@@ -129,3 +129,8 @@ pi-deploy/*
 *.csv
 backend/app/data/*.csv
 backend/app/data/geoip/
+
+# Electron / Packaging release outputs
+frontend/release/
+release/
+

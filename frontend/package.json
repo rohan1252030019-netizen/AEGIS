@@ -1,12 +1,14 @@
 {
   "name": "aegis-next",
-  "version": "1.6.5.1",
+  "version": "1.6.5",
   "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://127.0.0.1:3000 && electron electron/main.mjs\"",
     "build:map": "node scripts/build-vector-map.mjs",
     "build": "node scripts/build-vector-map.mjs && next build",
+    "app:build": "npm run build && electron-builder",
     "deploy-sync": "node scripts/deploy-sync.mjs",
     "start": "next start",
     "lint": "next lint"
@@ -37,12 +39,40 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "d3-geo": "^2.0.2",
+    "concurrently": "^9.2.1",
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "^15.3.3",
     "postcss": "^8",
     "tailwindcss": "^4.2.1",
     "topojson-client": "^3.1.0",
     "typescript": "^5",
-    "world-atlas": "^2.0.2"
+    "world-atlas": "^2.0.2",
+    "wait-on": "^8.0.4"
+  },
+  "main": "electron/main.mjs",
+  "build": {
+    "appId": "com.aegis.security",
+    "productName": "AEGIS Security",
+    "asar": false,
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

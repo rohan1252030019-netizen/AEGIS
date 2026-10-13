@@ -51,6 +51,7 @@ PROCESS_INTERVAL: int = int(os.getenv("AEGIS_PROCESS_INTERVAL", "10"))
 NETWORK_INTERVAL: int = int(os.getenv("AEGIS_NETWORK_INTERVAL", "10"))
 HEARTBEAT_INTERVAL: int = int(os.getenv("AEGIS_HEARTBEAT_INTERVAL", "30"))
 EVENT_FLUSH_INTERVAL: int = int(os.getenv("AEGIS_EVENT_FLUSH_INTERVAL", "5"))
+PERSISTENCE_INTERVAL: int = int(os.getenv("AEGIS_PERSISTENCE_INTERVAL", "30"))
 
 # ---------------------------------------------------------------------------
 # File Integrity Monitoring (platform-aware)

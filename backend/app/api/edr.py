@@ -484,3 +484,170 @@ async def list_rules(
         })
 
     return {"total": len(rules), "rules": rules}
+
+
+# ---------------------------------------------------------------------------
+# Host Isolation Endpoints (FR-09)
+# ---------------------------------------------------------------------------
+
+class IsolateHostRequest(BaseModel):
+    reason: str = "Incident containment"
+    lease_seconds: int = 900
+    confirm: bool = True
+
+
+class UnisolateHostRequest(BaseModel):
+    reason: str = "Containment resolved"
+
+
+@router.post("/hosts/{agent_id}/isolate")
+async def isolate_host_endpoint(
+    agent_id: str,
+    body: IsolateHostRequest,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(require_admin),
+):
+    """
+    Safely isolate managed host endpoint via Windows Defender Firewall.
+    Requires admin role and explicit confirmation.
+    Preserves AEGIS control plane, DNS, DHCP, and loopback traffic.
+    """
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Confirmation required to isolate host")
+
+    agent = await db.get(EndpointAgent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if auth.client_id and agent.client_id != auth.client_id:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    from app.api.agents import _enqueue_command
+
+    operator = auth.user_id or auth.client_id or "admin"
+    _enqueue_command(agent_id, {
+        "command": "isolate_host",
+        "params": {
+            "initiator": operator,
+            "reason": body.reason,
+            "lease_seconds": body.lease_seconds,
+        },
+    })
+
+    # Update agent state
+    cfg = dict(agent.config or {})
+    cfg["isolation"] = {
+        "state": "ISOLATING",
+        "isolated_by": operator,
+        "reason": body.reason,
+        "lease_seconds": body.lease_seconds,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    agent.config = cfg
+    await db.commit()
+
+    try:
+        await event_bus.publish_high("edr.host_isolated", {
+            "agent_id": agent_id,
+            "hostname": agent.hostname,
+            "action": "isolate",
+            "operator": operator,
+            "reason": body.reason,
+            "lease_seconds": body.lease_seconds,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "agent_id": agent_id,
+        "hostname": agent.hostname,
+        "status": "ISOLATING",
+        "message": f"Isolation command dispatched to {agent.hostname} (lease: {body.lease_seconds}s)",
+        "lease_seconds": body.lease_seconds,
+    }
+
+
+@router.post("/hosts/{agent_id}/unisolate")
+async def unisolate_host_endpoint(
+    agent_id: str,
+    body: UnisolateHostRequest = UnisolateHostRequest(),
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(require_admin),
+):
+    """
+    Restore host endpoint network connectivity by removing only AEGIS-owned firewall rules.
+    Requires admin role.
+    """
+    agent = await db.get(EndpointAgent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if auth.client_id and agent.client_id != auth.client_id:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    from app.api.agents import _enqueue_command
+
+    operator = auth.user_id or auth.client_id or "admin"
+    _enqueue_command(agent_id, {
+        "command": "unisolate_host",
+        "params": {
+            "initiator": operator,
+            "reason": body.reason,
+        },
+    })
+
+    cfg = dict(agent.config or {})
+    cfg["isolation"] = {
+        "state": "RESTORING",
+        "restored_by": operator,
+        "reason": body.reason,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    agent.config = cfg
+    await db.commit()
+
+    try:
+        await event_bus.publish_high("edr.host_unisolated", {
+            "agent_id": agent_id,
+            "hostname": agent.hostname,
+            "action": "unisolate",
+            "operator": operator,
+            "reason": body.reason,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "agent_id": agent_id,
+        "hostname": agent.hostname,
+        "status": "RESTORING",
+        "message": f"Unisolation command dispatched to {agent.hostname}",
+    }
+
+
+@router.get("/hosts/{agent_id}/isolation-status")
+async def get_host_isolation_status(
+    agent_id: str,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(require_analyst),
+):
+    """Query current isolation status of an endpoint agent."""
+    agent = await db.get(EndpointAgent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if auth.client_id and agent.client_id != auth.client_id:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    isolation_info = (agent.config or {}).get("isolation", {
+        "state": "NORMAL",
+        "updated_at": agent.updated_at.isoformat() if hasattr(agent, "updated_at") and agent.updated_at else datetime.utcnow().isoformat(),
+    })
+
+    return {
+        "agent_id": agent_id,
+        "hostname": agent.hostname,
+        "isolation": isolation_info,
+    }
+

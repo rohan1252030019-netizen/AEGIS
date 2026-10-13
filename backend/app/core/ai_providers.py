@@ -15,6 +15,7 @@ existing openrouter_client.query() return shape:
   }
 """
 
+import os
 import json
 import time
 import logging

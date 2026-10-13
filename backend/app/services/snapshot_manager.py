@@ -25,6 +25,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger("aegis.snapshot_manager")
@@ -310,27 +311,246 @@ class LinuxSnapshotProvider(SnapshotProvider):
 
 
 # ---------------------------------------------------------------------------
-# Windows — stub (real impl in Rust agent Phase R-E)
+# Windows — Volume Shadow Copy Service (VSS) (FR-09)
 # ---------------------------------------------------------------------------
 
-class WindowsSnapshotProvider(SnapshotProvider):
-    """Stub. Real VSS implementation lives in the Rust node agent (Phase R-E)."""
+_VSS_SHADOW_ID_RE = re.compile(r"Shadow Copy ID:\s*({[a-fA-F0-9\-]+})", re.IGNORECASE)
+_VSS_SHADOW_VOL_RE = re.compile(
+    r"Shadow Copy Volume:\s*(\\\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy\d+)",
+    re.IGNORECASE,
+)
+_VSS_TIME_RE = re.compile(r"Creation Time:\s*([^\r\n]+)", re.IGNORECASE)
 
-    _NOT_SUPPORTED_MSG = (
-        "Windows snapshot restore is handled by the Rust node agent (Phase R-E). "
-        "This stub is a placeholder."
-    )
+
+def _parse_vss_date(date_str: str) -> datetime:
+    formats = [
+        "%m/%d/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%m/%d/%Y %I:%M:%S %p",
+        "%d/%m/%Y %I:%M:%S %p",
+        "%Y/%m/%d %H:%M:%S",
+    ]
+    clean = date_str.strip()
+    for fmt in formats:
+        try:
+            return datetime.strptime(clean, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc)
+
+
+def _parse_vss_output(text: str, host_id: str) -> list[Snapshot]:
+    snapshots: list[Snapshot] = []
+    blocks = re.split(r"(?=Shadow Copy ID:)", text, flags=re.IGNORECASE)
+    for block in blocks:
+        id_match = _VSS_SHADOW_ID_RE.search(block)
+        if not id_match:
+            continue
+        snap_id = id_match.group(1)
+
+        vol_match = _VSS_SHADOW_VOL_RE.search(block)
+        shadow_vol = vol_match.group(1) if vol_match else ""
+
+        time_match = _VSS_TIME_RE.search(block)
+        created_at = datetime.now(timezone.utc)
+        if time_match:
+            created_at = _parse_vss_date(time_match.group(1).strip())
+
+        snapshots.append(
+            Snapshot(
+                id=snap_id,
+                host_id=host_id,
+                created_at=created_at,
+                label=shadow_vol or f"VSS-{snap_id}",
+                provider="vss",
+            )
+        )
+    return snapshots
+
+
+class WindowsSnapshotProvider(SnapshotProvider):
+    """
+    Real Windows Volume Shadow Copy (VSS) provider.
+    Handles snapshot discovery, verification, creation, and path-traversal-protected
+    file recovery from Volume Shadow Copies.
+    """
 
     def list_snapshots(self, host_id: str) -> list[Snapshot]:
-        logger.warning("snapshot_manager(windows): %s", self._NOT_SUPPORTED_MSG)
-        return []
+        result = _run(["vssadmin", "list", "shadows"])
+        if result.returncode != 0:
+            logger.warning(
+                "snapshot_manager(windows): vssadmin list shadows failed: %s",
+                result.stderr.decode(errors="replace").strip(),
+            )
+            return []
+
+        stdout = result.stdout.decode(errors="replace")
+        return _parse_vss_output(stdout, host_id)
 
     def verify_recent(self, host_id: str) -> bool:
-        logger.warning("snapshot_manager(windows): %s", self._NOT_SUPPORTED_MSG)
-        return False
+        snaps = self.list_snapshots(host_id)
+        return any(s.age_hours() <= _MAX_SNAPSHOT_AGE_HOURS for s in snaps)
 
-    def restore(self, host_id: str, snapshot_id: str, target_path: str) -> RestoreJob:
-        raise NotImplementedError(self._NOT_SUPPORTED_MSG)
+    def create_snapshot(self, volume: str = "C:") -> Snapshot:
+        clean_vol = volume.rstrip("\\/ ")
+        if not clean_vol.endswith(":"):
+            clean_vol = f"{clean_vol}:"
+
+        result = _run(["vssadmin", "create", "shadow", f"/for={clean_vol}"])
+        if result.returncode != 0:
+            err = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"vssadmin create shadow failed: {err}")
+
+        stdout = result.stdout.decode(errors="replace")
+        snaps = _parse_vss_output(stdout, "localhost")
+        if snaps:
+            return snaps[0]
+
+        id_match = _VSS_SHADOW_ID_RE.search(stdout)
+        snap_id = id_match.group(1) if id_match else str(uuid.uuid4())
+        return Snapshot(
+            id=snap_id,
+            host_id="localhost",
+            created_at=datetime.now(timezone.utc),
+            label=f"VSS-{clean_vol}",
+            provider="vss",
+        )
+
+    def restore(
+        self,
+        host_id: str,
+        snapshot_id: str,
+        target_path: str,
+        dry_run: bool = False,
+    ) -> RestoreJob:
+        job_id = str(uuid.uuid4())
+
+        # Boundary validation: Reject live system volume rollback
+        clean_target = (target_path or "").strip()
+        norm_target = os.path.normpath(clean_target).rstrip("\\/") if clean_target else ""
+        if not clean_target or norm_target in ("C:", "c:", "\\", "/", ".", "") or re.match(r"^[a-zA-Z]:$", norm_target):
+            err_msg = (
+                "Live full-system volume rollback is not supported online. "
+                "To recover files safely, specify a non-root restore target directory to extract files from the Volume Shadow Copy."
+            )
+            logger.error("snapshot_manager(windows): %s (target=%s)", err_msg, target_path)
+            return RestoreJob(
+                job_id=job_id,
+                host_id=host_id,
+                snapshot_id=snapshot_id,
+                target_path=target_path,
+                status="failed",
+                error=err_msg,
+            )
+
+        # Path traversal protection
+        try:
+            resolved_target = Path(target_path).resolve()
+            system_root = Path(os.environ.get("SystemRoot", r"C:\Windows")).resolve()
+            if resolved_target == system_root or system_root in resolved_target.parents:
+                err_msg = "Invalid target path: restoring into system root directory is forbidden."
+                logger.error("snapshot_manager(windows): %s", err_msg)
+                return RestoreJob(
+                    job_id=job_id,
+                    host_id=host_id,
+                    snapshot_id=snapshot_id,
+                    target_path=target_path,
+                    status="failed",
+                    error=err_msg,
+                )
+        except Exception as e:
+            return RestoreJob(
+                job_id=job_id,
+                host_id=host_id,
+                snapshot_id=snapshot_id,
+                target_path=target_path,
+                status="failed",
+                error=f"Target path validation failed: {e}",
+            )
+
+        # Dry-run mode
+        if dry_run:
+            logger.info(
+                "snapshot_manager(windows): Dry run restore validation passed for snapshot=%s target=%s",
+                snapshot_id, target_path,
+            )
+            return RestoreJob(
+                job_id=job_id,
+                host_id=host_id,
+                snapshot_id=snapshot_id,
+                target_path=target_path,
+                status="completed",
+                error=None,
+            )
+
+        # Locate shadow volume
+        snapshots = self.list_snapshots(host_id)
+        target_snap = next(
+            (s for s in snapshots if s.id.lower() == snapshot_id.lower()),
+            None,
+        )
+        shadow_device = (
+            target_snap.label
+            if (target_snap and target_snap.label and "GLOBALROOT" in target_snap.label)
+            else None
+        )
+
+        if not shadow_device:
+            safe_snap = _safe_label(snapshot_id)
+            result = _run(["vssadmin", "list", "shadows", f"/shadow={safe_snap}"])
+            if result.returncode == 0:
+                match = _VSS_SHADOW_VOL_RE.search(result.stdout.decode(errors="replace"))
+                if match:
+                    shadow_device = match.group(1)
+
+        if not shadow_device:
+            err_msg = f"Shadow copy ID {snapshot_id} not found or inaccessible."
+            logger.error("snapshot_manager(windows): %s", err_msg)
+            return RestoreJob(
+                job_id=job_id,
+                host_id=host_id,
+                snapshot_id=snapshot_id,
+                target_path=target_path,
+                status="failed",
+                error=err_msg,
+            )
+
+        # Robocopy from shadow volume device path
+        try:
+            resolved_target.mkdir(parents=True, exist_ok=True)
+            source_path = f"{shadow_device}\\"
+            robocopy_cmd = ["robocopy", source_path, str(resolved_target), "/E", "/R:1", "/W:1"]
+            res = _run(robocopy_cmd)
+            # Robocopy return codes 0-7 indicate success
+            if res.returncode > 7:
+                err_msg = f"robocopy failed with exit code {res.returncode}: {res.stderr.decode(errors='replace').strip()}"
+                logger.error("snapshot_manager(windows): %s", err_msg)
+                return RestoreJob(
+                    job_id=job_id,
+                    host_id=host_id,
+                    snapshot_id=snapshot_id,
+                    target_path=target_path,
+                    status="failed",
+                    error=err_msg,
+                )
+        except Exception as exc:
+            return RestoreJob(
+                job_id=job_id,
+                host_id=host_id,
+                snapshot_id=snapshot_id,
+                target_path=target_path,
+                status="failed",
+                error=f"Robocopy restore failed: {exc}",
+            )
+
+        return RestoreJob(
+            job_id=job_id,
+            host_id=host_id,
+            snapshot_id=snapshot_id,
+            target_path=target_path,
+            status="completed",
+        )
 
 
 # ---------------------------------------------------------------------------
