@@ -13,6 +13,7 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ['*.trycloudflare.com', 'cedar-kept-anywhere-immunology.trycloudflare.com'],
   env: {
     NEXT_PUBLIC_AEGIS_VERSION: pkg.version,
   },

@@ -190,7 +190,7 @@ export default function SetupWizard() {
   // Dynamic AI providers — fetched from API, with fallback
   const [aiProviders, setAiProviders] = useState(FALLBACK_PROVIDERS);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
   // Detect network/connection failures (ERR_CONNECTION_REFUSED, DNS failures, CORS, offline)
   // fetch() throws TypeError on network errors; ApiError has a .status
@@ -258,7 +258,7 @@ export default function SetupWizard() {
 
     // Fetch available AI providers from API
     const loadProviders = () => {
-      const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
       fetch(`${BASE}/ai/providers`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
@@ -455,7 +455,7 @@ export default function SetupWizard() {
     setError('');
     try {
       if (state.selectedHoneypots.length > 0) {
-        const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+        const BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
         const token = getJwtToken();
         const hdrs: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) hdrs['Authorization'] = `Bearer ${token}`;
@@ -489,7 +489,7 @@ export default function SetupWizard() {
     setScanProgress(0);
     setError('');
     try {
-      const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
       // Launch scan
       const token = getJwtToken();
@@ -591,7 +591,7 @@ export default function SetupWizard() {
     if (selectedAssets.length === 0) return setError('Select at least one asset to register');
     setLoading(true);
     try {
-      const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
       const token = getJwtToken();
       const hdrs: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) hdrs['Authorization'] = `Bearer ${token}`;

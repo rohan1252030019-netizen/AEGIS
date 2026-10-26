@@ -237,8 +237,6 @@ function buildWsUrl(): string {
   }
   return `${wsRoot}/ws?client_id=${encodeURIComponent(clientId)}`;
 }
-  return `${wsRoot}/ws?client_id=${encodeURIComponent(clientId)}`;
-}
 
 export function getLiveWS(): LiveWS {
   if (!_singleton) {
