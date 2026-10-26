@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: aegis-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: AEGIS_SECRET_KEY
+        generateValue: true
+      - key: AEGIS_API_KEY
+        value: "c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ"
+      - key: AEGIS_ENV
+        value: "production"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
