@@ -223,14 +223,20 @@ class LiveWS {
 let _singleton: LiveWS | null = null;
 
 function buildWsUrl(): string {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-  // Strip trailing /api/v1 to get the root
-  const root = apiBase.replace(/\/api\/v1\/?$/, "");
-  const wsRoot = root.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+  let wsRoot = "ws://localhost:8000";
+  if (typeof window !== "undefined") {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    wsRoot = `${proto}//${window.location.host}`;
+  } else if (process.env.NEXT_PUBLIC_API_URL) {
+    const root = process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, "");
+    wsRoot = root.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+  }
   let clientId = "anonymous";
   if (typeof window !== "undefined") {
     clientId = localStorage.getItem("aegis_client_id") || "dashboard-live";
   }
+  return `${wsRoot}/ws?client_id=${encodeURIComponent(clientId)}`;
+}
   return `${wsRoot}/ws?client_id=${encodeURIComponent(clientId)}`;
 }
 

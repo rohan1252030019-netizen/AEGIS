@@ -33,6 +33,10 @@ const nextConfig = {
         source: '/openapi.json',
         destination: `${BACKEND_URL}/openapi.json`,
       },
+      {
+        source: '/ws',
+        destination: `${BACKEND_URL}/ws`,
+      },
     ];
   },
 };
