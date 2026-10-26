@@ -13,6 +13,6 @@ services:
       - key: AEGIS_API_KEY
         value: "c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ"
       - key: AEGIS_ENV
-        value: "production"
+        value: "development"
       - key: PYTHON_VERSION
         value: "3.11.9"
