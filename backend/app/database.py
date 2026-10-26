@@ -19,8 +19,16 @@ if _is_sqlite:
 elif _is_mysql:
     # MySQL / aiomysql — pool_pre_ping keeps connections alive,
     # pool_recycle prevents "server has gone away" on idle connections.
+    connect_args = {}
+    if "tidbcloud" in settings.DATABASE_URL or "ssl" in settings.DATABASE_URL.lower():
+        import ssl
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        connect_args["ssl"] = ctx
     engine = create_async_engine(
         settings.DATABASE_URL,
+        connect_args=connect_args,
         echo=settings.AEGIS_ENV == "development",
         pool_size=10,
         max_overflow=20,
