@@ -1,0 +1,9 @@
+node_modules
+.next
+release
+dist
+.vercel
+.git
+.design-review
+*.mp4
+*.exe
