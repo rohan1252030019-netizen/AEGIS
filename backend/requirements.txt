@@ -26,8 +26,8 @@ aiohttp>=3.9.0
 APScheduler>=3.10.0
 
 # Vector DB & embeddings
-qdrant-client>=1.7.0
-sentence-transformers>=2.3.0
+# qdrant-client>=1.7.0
+# sentence-transformers>=2.3.0
 
 # DNS & packet analysis
 dnspython>=2.5.0
