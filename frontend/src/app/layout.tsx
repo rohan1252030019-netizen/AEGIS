@@ -47,7 +47,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://aegis.somoswilab.com'),
-  title: 'AEGIS | Open-Source Ransomware Defense and EDR Platform',
+  title: 'Ram Antivirus | Open-Source Ransomware Defense and EDR Platform',
   description: 'Self-hosted autonomous defense platform. Detects ransomware, lateral movement, and intrusions in <1 ms with 134 Sigma rules. Offline-capable. No cloud AI required. Free, AGPL-3.0.',
   keywords: [
     'open source EDR',
@@ -61,26 +61,26 @@ export const metadata: Metadata = {
     'Sigma rules',
     'autonomous incident response',
   ],
-  authors: [{ name: 'AEGIS Contributors' }],
-  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'AEGIS' },
+  authors: [{ name: 'Ram Antivirus Contributors' }],
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Ram Antivirus' },
   openGraph: {
     type: 'website',
-    siteName: 'AEGIS',
-    title: 'AEGIS — Open-Source Ransomware Defense and EDR Platform',
+    siteName: 'Ram Antivirus',
+    title: 'Ram Antivirus — Open-Source Ransomware Defense and EDR Platform',
     description: 'Self-hosted. Deterministic-first. Detects ransomware in <1 ms with 134 Sigma rules. Offline-capable. Free, AGPL-3.0.',
-    url: 'https://github.com/alejadxr/AEGIS',
+    url: 'https://github.com/rohan1252030019-netizen/AEGIS',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'AEGIS — Autonomous Defense Platform',
+        alt: 'Ram Antivirus — Autonomous Defense Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'AEGIS — Open-Source Ransomware Defense and EDR Platform',
+    title: 'Ram Antivirus — Open-Source Ransomware Defense and EDR Platform',
     description: 'Self-hosted. Deterministic-first. Detects ransomware in <1 ms. 134 Sigma rules. Offline-capable. Free, AGPL-3.0.',
     images: ['/og-image.png'],
   },
@@ -111,19 +111,19 @@ export default function RootLayout({
               "@graph": [
                 {
                   "@type": "SoftwareApplication",
-                  "name": "AEGIS",
-                  "alternateName": "AEGIS Autonomous Defense Platform",
+                  "name": "Ram Antivirus",
+                  "alternateName": "Ram Antivirus Autonomous Defense Platform",
                   "description": "Open-source, self-hosted autonomous cybersecurity defense platform. Detects ransomware, lateral movement, and intrusions in <1 ms using 134 Sigma rules. Offline-capable. No cloud AI required.",
                   "applicationCategory": "SecurityApplication",
                   "operatingSystem": "Linux, macOS, Windows",
                   "softwareVersion": AEGIS_VERSION || "1.6.2",
                   "datePublished": "2026-05-01",
                   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
-                  "url": "https://github.com/alejadxr/AEGIS",
+                  "url": "https://github.com/rohan1252030019-netizen/AEGIS",
                   "downloadUrl": AEGIS_VERSION
-                    ? `https://github.com/alejadxr/AEGIS/releases/tag/v${AEGIS_VERSION}`
-                    : "https://github.com/alejadxr/AEGIS/releases/tag/v1.6.2",
-                  "codeRepository": "https://github.com/alejadxr/AEGIS",
+                    ? `https://github.com/rohan1252030019-netizen/AEGIS/releases/tag/v${AEGIS_VERSION}`
+                    : "https://github.com/rohan1252030019-netizen/AEGIS/releases/tag/v1.6.2",
+                  "codeRepository": "https://github.com/rohan1252030019-netizen/AEGIS",
                   "programmingLanguage": ["Python", "TypeScript", "Rust"],
                   "keywords": "open source EDR, self-hosted ransomware defense, deterministic SOAR, open source SIEM alternative, MITRE ATT&CK detection, ransomware kill-chain, offline security platform",
                   "featureList": [
@@ -149,23 +149,23 @@ export default function RootLayout({
                   "mainEntity": [
                     {
                       "@type": "Question",
-                      "name": "What is AEGIS cybersecurity?",
+                      "name": "What is Ram Antivirus cybersecurity?",
                       "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "AEGIS is an open-source, self-hosted autonomous defense platform that detects ransomware, lateral movement, and intrusions in real time. It evaluates 134 Sigma rules in <1 ms, runs deception honeypots, enforces firewall blocks, and orchestrates snapshot recovery — without requiring a cloud AI service."
+                        "text": "Ram Antivirus is an open-source, self-hosted autonomous defense platform that detects ransomware, lateral movement, and intrusions in real time. It evaluates 134 Sigma rules in <1 ms, runs deception honeypots, enforces firewall blocks, and orchestrates snapshot recovery — without requiring a cloud AI service."
                       }
                     },
                     {
                       "@type": "Question",
-                      "name": "How does AEGIS detect ransomware?",
+                      "name": "How does Ram Antivirus detect ransomware?",
                       "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "AEGIS v1.6 ships 12 ransomware-specific Sigma rules and 1 kill-chain detection mapped to MITRE T1490, T1486, T1105, T1218, and T1021. It detects shadow-copy deletion, mass file encryption (entropy ≥7.5 bits/byte at ≥50 writes/s), canary file trips, ransom note drops, LOLBin staging, SMB/RDP/WinRM lateral movement — all in <1 ms per event."
+                        "text": "Ram Antivirus v1.6 ships 12 ransomware-specific Sigma rules and 1 kill-chain detection mapped to MITRE T1490, T1486, T1105, T1218, and T1021. It detects shadow-copy deletion, mass file encryption (entropy ≥7.5 bits/byte at ≥50 writes/s), canary file trips, ransom note drops, LOLBin staging, SMB/RDP/WinRM lateral movement — all in <1 ms per event."
                       }
                     },
                     {
                       "@type": "Question",
-                      "name": "Does AEGIS work without an AI API key?",
+                      "name": "Does Ram Antivirus work without an AI API key?",
                       "acceptedAnswer": {
                         "@type": "Answer",
                         "text": "Yes. Set AEGIS_AI_MODE=offline and the entire detection and response stack runs on deterministic Sigma rules, static playbooks, and Jinja2 templates. No external API calls are made."

@@ -1,10 +1,10 @@
-# AEGIS — LLM-Discoverable Site Structure
+# Ram Antivirus — LLM-Discoverable Site Structure
 # https://llmstxt.org
 # Version: 1.6.2 | Updated: 2026-06-23
 
 ## Project
 
-AEGIS is an open-source, self-hosted autonomous cybersecurity defense platform.
+Ram Antivirus is an open-source, self-hosted autonomous cybersecurity defense platform.
 It detects ransomware, lateral movement, and intrusions in <1 ms using 134 Sigma rules.
 Offline-capable. No cloud AI required. AGPL-3.0.
 
@@ -44,7 +44,7 @@ autonomous incident response, self-hosted EDR, open source honeypot
 ### SEO / Explainer Pages (docs/seo/)
 - docs/seo/what-is-aegis.md — Full product explainer, ~800 words, E-E-A-T optimized
 - docs/seo/ransomware-defense.md — Technical ransomware defense FAQ, ~1,200 words
-- docs/seo/comparison.md — AEGIS vs Wazuh / OSSEC / Elastic Security
+- docs/seo/comparison.md — Ram Antivirus vs Wazuh / OSSEC / Elastic Security
 
 ### Architecture and Planning (docs/superpowers/)
 - docs/superpowers/specs/2026-04-08-aegis-edr-master-plan.md — EDR feature spec
@@ -73,9 +73,9 @@ autonomous incident response, self-hosted EDR, open source honeypot
 
 ## Competitive Context
 
-AEGIS vs Wazuh: AEGIS detects in <1 ms vs 5–60 s; ships ransomware kill-chain, honeypots, recovery.
-AEGIS vs OSSEC: AEGIS adds Sigma engine, REST API, dashboard, deception, recovery.
-AEGIS vs Elastic Security: AEGIS deploys in 3 min vs weeks; runs offline; no per-volume billing.
+Ram Antivirus vs Wazuh: Ram Antivirus detects in <1 ms vs 5–60 s; ships ransomware kill-chain, honeypots, recovery.
+Ram Antivirus vs OSSEC: Ram Antivirus adds Sigma engine, REST API, dashboard, deception, recovery.
+Ram Antivirus vs Elastic Security: Ram Antivirus deploys in 3 min vs weeks; runs offline; no per-volume billing.
 
 ## Contact
 

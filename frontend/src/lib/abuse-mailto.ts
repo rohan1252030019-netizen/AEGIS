@@ -70,7 +70,7 @@ export function buildAbuseMailto(intel: AbuseMailtoIntel): string {
   if (intel.country) lines.push(`Country:      ${intel.country}`);
   if (intel.hostname) lines.push(`Reverse DNS:  ${intel.hostname}`);
   lines.push(``);
-  lines.push(`AEGIS detection evidence:`);
+  lines.push(`Ram Antivirus detection evidence:`);
   if (intel.classification) lines.push(`  classification: ${intel.classification}`);
   if (intel.confidence) {
     const c = intel.confidence;
@@ -101,7 +101,7 @@ export function buildAbuseMailto(intel: AbuseMailtoIntel): string {
   lines.push(``);
   lines.push(`Please investigate and take appropriate action. Thank you.`);
   lines.push(``);
-  lines.push(`— Reported by an AEGIS-defended network`);
+  lines.push(`— Reported by a Ram Antivirus-defended network`);
   const body = lines.join('\n');
   return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }

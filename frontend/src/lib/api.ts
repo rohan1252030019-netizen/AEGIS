@@ -7,7 +7,7 @@ export class ApiError extends Error {
   }
 }
 
-function getApiKey(): string | null {
+export function getApiKey(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('aegis_api_key');
 }
@@ -15,6 +15,15 @@ function getApiKey(): string | null {
 export function getJwtToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('aegis_jwt_token');
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const jwt = getJwtToken();
+  const key = getApiKey();
+  if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+  else if (key) headers['X-API-Key'] = key;
+  return headers;
 }
 
 export function setApiKey(key: string): void {

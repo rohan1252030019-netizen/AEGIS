@@ -272,7 +272,7 @@ export default function IncidentDetailPage() {
   }, [id, reloadToken]);
 
   useEffect(() => {
-    if (detail?.title) document.title = `${detail.title} · AEGIS`;
+    if (detail?.title) document.title = `${detail.title} · Ram Antivirus`;
   }, [detail?.title]);
 
   const refetch = useCallback(() => setReloadToken((t) => t + 1), []);

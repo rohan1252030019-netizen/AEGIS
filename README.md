@@ -1,26 +1,26 @@
 <div align="center">
 
-# AEGIS — Open-Source Autonomous Ransomware Defense and EDR Platform
+# Ram Antivirus — Open-Source Autonomous Ransomware Defense and EDR Platform
 
 ### Self-hosted. Deterministic-first. Offline-capable.
 
 *Detect, block, and recover from ransomware and intrusions in milliseconds — 168 Sigma rules + 6 chain detections, <1 ms in-memory evaluation, no LLM in the hot path.*
 
-[![CI](https://github.com/alejadxr/AEGIS/actions/workflows/ci.yml/badge.svg)](https://github.com/alejadxr/AEGIS/actions)
+[![CI](https://github.com/rohan1252030019-netizen/AEGIS/actions/workflows/ci.yml/badge.svg)](https://github.com/rohan1252030019-netizen/AEGIS/actions)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue)]()
 [![Docker](https://img.shields.io/badge/docker-compose-blue)]()
 [![Version](https://img.shields.io/badge/version-1.6.5.1-cyan)]()
 
-[What is AEGIS?](#what-is-aegis) · [Install](#5-minute-install) · [Ransomware Defense](#ransomware-defense-v16) · [Detection](#detection-1111-verified) · [vs Wazuh / OSSEC / Elastic](#aegis-vs-wazuh--ossec--elastic-security) · [Architecture](#architecture) · [Docs](docs/)
+[What is Ram Antivirus?](#what-is-ram-antivirus) · [Install](#5-minute-install) · [Ransomware Defense](#ransomware-defense-v16) · [Detection](#detection-1111-verified) · [vs Wazuh / OSSEC / Elastic](#ram-antivirus-vs-wazuh--ossec--elastic-security) · [Architecture](#architecture) · [Docs](docs/)
 
 </div>
 
 ---
 
-## What is AEGIS?
+## What is Ram Antivirus?
 
-**AEGIS is an open-source, self-hosted autonomous defense platform that detects ransomware, lateral movement, and intrusions in real time — without depending on a cloud AI service.**
+**Ram Antivirus is an open-source, self-hosted autonomous defense platform that detects ransomware, lateral movement, and intrusions in real time — without depending on a cloud AI service.**
 
 It owns your firewall, watches your logs, runs deception honeypots, and evaluates 168 Sigma rules + 6 chain detections in **<1 ms per event**. When it sees an attack — brute-force, shadow-copy delete, mass file encryption, ransom note drop, SMB lateral movement — it auto-blocks the attacker IP and writes a structured incident postmortem. Process termination and snapshot recovery are in development (gated by `AEGIS_REAL_RECOVERY=1`).
 
@@ -32,7 +32,7 @@ Set `AEGIS_AI_MODE=disabled` and the entire stack runs on deterministic rules an
 - **Phantom** — deception layer (SSH honeypot on :2222, HTTP decoy on :8888, breadcrumb credential traps)
 
 ```bash
-git clone https://github.com/alejadxr/AEGIS.git && cd AEGIS
+git clone https://github.com/rohan1252030019-netizen/AEGIS.git && cd AEGIS
 docker compose up -d
 # Dashboard: http://localhost:3007 · API: http://localhost:8000
 ```
@@ -41,9 +41,9 @@ docker compose up -d
 
 ## Frequently Asked Questions
 
-### How does AEGIS detect ransomware?
+### How does Ram Antivirus detect ransomware?
 
-AEGIS v1.6 ships **12 ransomware-specific Sigma rules + 1 kill-chain** mapped to MITRE ATT&CK techniques T1490, T1486, T1105, T1218, and T1021. The correlation engine evaluates each event in **<1 ms** using an O(1) type-indexed rule lookup.
+Ram Antivirus v1.6 ships **12 ransomware-specific Sigma rules + 1 kill-chain** mapped to MITRE ATT&CK techniques T1490, T1486, T1105, T1218, and T1021. The correlation engine evaluates each event in **<1 ms** using an O(1) type-indexed rule lookup.
 
 Specific behaviors detected:
 - **Shadow-copy deletion** — `vssadmin delete shadows`, `wbadmin delete catalog`, `bcdedit /set {default} recoveryenabled No`, tmutil, btrfs snapshot delete
@@ -57,7 +57,7 @@ Specific behaviors detected:
 
 The **RaaS threat intel feed** (refreshed every 6 hours from RansomLook + CISA) supplies current C2 IP ranges, onion addresses, file extensions, and ransom note artifacts for known groups: LockBit, Akira, REvil, BlackCat/ALPHV, Babuk, Conti, WannaCry, and others.
 
-### Is AEGIS really offline-capable?
+### Is Ram Antivirus really offline-capable?
 
 Yes. Set `AEGIS_AI_MODE=disabled` and every AI call site falls back to a deterministic path:
 
@@ -72,13 +72,13 @@ Yes. Set `AEGIS_AI_MODE=disabled` and every AI call site falls back to a determi
 
 The RaaS intel feed, Sigma rules, chain detections, and all firewall blocking continue to operate with no external API calls.
 
-### How does AEGIS compare to a traditional SIEM or EDR?
+### How does Ram Antivirus compare to a traditional SIEM or EDR?
 
-See the [comparison table](#aegis-vs-wazuh--ossec--elastic-security) below. The short answer: AEGIS trades unlimited enterprise scale for deterministic-first detection at machine speed and zero licensing cost.
+See the [comparison table](#ram-antivirus-vs-wazuh--ossec--elastic-security) below. The short answer: Ram Antivirus trades unlimited enterprise scale for deterministic-first detection at machine speed and zero licensing cost.
 
-### Can I run AEGIS on a homelab or Mac mini?
+### Can I run Ram Antivirus on a homelab or Mac mini?
 
-Yes. AEGIS is tested in production on a Mac Pro (FastAPI + Next.js via PM2) with a Raspberry Pi 5 as a Tailscale relay. A Mac mini, a Pi, or any Linux VPS with Docker is sufficient. The Rust endpoint agent builds for macOS arm64, Linux x64, and Windows x64.
+Yes. Ram Antivirus is tested in production on a Mac Pro (FastAPI + Next.js via PM2) with a Raspberry Pi 5 as a Tailscale relay. A Mac mini, a Pi, or any Linux VPS with Docker is sufficient. The Rust endpoint agent builds for macOS arm64, Linux x64, and Windows x64.
 
 ### What are the system requirements?
 
@@ -166,9 +166,9 @@ Generates 100 entropy-padded dummy files in a tempdir, drops a ransom note, race
 
 ---
 
-## AEGIS vs Wazuh / OSSEC / Elastic Security
+## Ram Antivirus vs Wazuh / OSSEC / Elastic Security
 
-| Capability | AEGIS v1.6 | Wazuh 4.x | OSSEC 3.x | Elastic Security 8.x |
+| Capability | Ram Antivirus v1.6 | Wazuh 4.x | OSSEC 3.x | Elastic Security 8.x |
 |---|---|---|---|---|
 | **Detection latency** | <1 ms (in-memory Sigma eval) | 5–60 s pipeline | 5–30 s | 10–60 s |
 | **Action latency** | <50 ms (local pfctl/iptables) | Active response ~5 s | Active response ~5 s | Manual SOAR / hours |
@@ -185,7 +185,7 @@ Generates 100 entropy-padded dummy files in a tempdir, drops a ransom note, race
 | **Rust endpoint agent** | Yes (EDR + entropy + canary) | C agent | C agent | Elastic agent (Go) |
 | **Deception / breadcrumb traps** | Yes | No | No | No |
 
-**Where AEGIS wins**: solo operators, indie SaaS teams, and homelabs that need deterministic ransomware kill-chain detection with sub-50 ms automated blocking and zero per-seat licensing. `docker compose up -d` and you have rules + honeypots + firewall enforcement in 3 minutes.
+**Where Ram Antivirus wins**: solo operators, indie SaaS teams, and homelabs that need deterministic ransomware kill-chain detection with sub-50 ms automated blocking and zero per-seat licensing. `docker compose up -d` and you have rules + honeypots + firewall enforcement in 3 minutes.
 
 **Where to choose Wazuh/Elastic instead**: large multi-site enterprise deployments, regulated environments requiring Magic-Quadrant vendor relationships, or teams with dedicated SOC staff.
 
@@ -213,18 +213,45 @@ Every detection capability tested against real attack patterns:
 
 ---
 
+## API Keys & Authentication {#api-keys}
+<a id="api-keys"></a>
+
+Access to the Ram Antivirus (AEGIS) Security Operations Console is governed by role-based JWT sessions and cryptographic API keys.
+
+### Local Evaluation Credentials
+When testing or running locally:
+- **Operator Email:** `admin@aegis.local`
+- **Password:** `admin123456`
+- **Master API Key:** `c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ`
+
+### Generating & Provisioning Keys
+- **Operator Console:** Navigate to **Settings > API Configuration** to generate, view, or rotate keys.
+- **Programmatic Generation:** Operators can issue new client keys via:
+  ```bash
+  curl -X POST http://localhost:8000/api/v1/auth/api-key \
+    -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  ```
+- **Endpoint Agent Enrollment:** Set the key in `agent/config.py` or export it into your environment before starting the host monitor:
+  ```bash
+  export AEGIS_API_URL="http://localhost:8000/api/v1"
+  export AEGIS_API_KEY="c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ"
+  python agent/aegis_agent.py
+  ```
+
+---
+
 ## 5-Minute Install
 
 **Prerequisites:** Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/alejadxr/AEGIS.git
+git clone https://github.com/rohan1252030019-netizen/AEGIS.git
 cd AEGIS
 
 # Configure
 cp .env.example .env
 # Edit .env — set AEGIS_SECRET_KEY and POSTGRES_PASSWORD at minimum
-# OPENROUTER_API_KEY is optional; omit it and AEGIS runs fully offline
+# OPENROUTER_API_KEY is optional; omit it and Ram Antivirus runs fully offline
 
 # Launch
 docker compose up -d
@@ -277,7 +304,7 @@ cd frontend && npm install && npm run build && npm start
 
 ## Autonomous Response
 
-AEGIS is built to run unattended, so it does not hold decisions for an operator.
+Ram Antivirus is built to run unattended, so it does not hold decisions for an operator.
 An approval queue on an unwatched system is not caution — it is an attacker
 walking free while rows accumulate in a dashboard nobody is reading.
 
@@ -371,7 +398,7 @@ Incoming Event
           REST API + WebSocket (real-time push)
                  |
 +----------------+------------------+
-|       AEGIS Backend (FastAPI)     |
+|   Ram Antivirus Backend (FastAPI) |
 |            Port 8000              |
 |  +---------+  +----------+       |
 |  | Surface |  | Response |       |
@@ -475,7 +502,7 @@ aegis/
 │       └── ransomware/         # RaaS timeline, events, decryptor lookup
 ├── agent-rust/                 # Standalone Rust EDR agent
 │   └── src/ransomware/         # Canary, entropy, killer, rollback
-├── desktop-tauri/              # AEGIS Manager desktop app (Tauri v2)
+├── desktop-tauri/              # Ram Antivirus Manager desktop app (Tauri v2)
 ├── docs/                       # Documentation
 │   └── seo/                    # Explainer pages (what-is, ransomware, comparison)
 ├── .well-known/
@@ -529,7 +556,7 @@ Found a vulnerability? See [SECURITY.md](SECURITY.md) for our responsible disclo
 
 ## License
 
-AEGIS is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+Ram Antivirus is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
 
 Free to use, modify, and distribute. If you run a modified version as a network service, you must make the source code available to users.
 
@@ -537,9 +564,9 @@ Free to use, modify, and distribute. If you run a modified version as a network 
 
 ## More Reading
 
-- [What is AEGIS? — Full explainer](docs/seo/what-is-aegis.md)
-- [How AEGIS detects ransomware](docs/seo/ransomware-defense.md)
-- [AEGIS vs Wazuh / OSSEC / Elastic Security](docs/seo/comparison.md)
+- [What is Ram Antivirus? — Full explainer](docs/seo/what-is-aegis.md)
+- [How Ram Antivirus detects ransomware](docs/seo/ransomware-defense.md)
+- [Ram Antivirus vs Wazuh / OSSEC / Elastic Security](docs/seo/comparison.md)
 - [Architecture deep dive](ARCHITECTURE.md)
 - [Contributing](CONTRIBUTING.md)
 
@@ -555,17 +582,17 @@ Paste this block into any HTML landing page <head> to enable rich results.
   "@graph": [
     {
       "@type": "SoftwareApplication",
-      "name": "AEGIS",
-      "alternateName": "AEGIS Autonomous Defense Platform",
+      "name": "Ram Antivirus",
+      "alternateName": "Ram Antivirus Autonomous Defense Platform",
       "description": "Open-source, self-hosted autonomous cybersecurity defense platform. Detects ransomware, lateral movement, and intrusions in <1 ms using 168 Sigma rules + 6 chain detections. Offline-capable. No cloud AI required.",
       "applicationCategory": "SecurityApplication",
       "operatingSystem": "Linux, macOS, Windows",
       "softwareVersion": "1.6.5.1",
       "datePublished": "2026-05-01",
       "license": "https://www.gnu.org/licenses/agpl-3.0.html",
-      "url": "https://github.com/alejadxr/AEGIS",
-      "downloadUrl": "https://github.com/alejadxr/AEGIS/releases/latest",
-      "codeRepository": "https://github.com/alejadxr/AEGIS",
+      "url": "https://github.com/rohan1252030019-netizen/AEGIS",
+      "downloadUrl": "https://github.com/rohan1252030019-netizen/AEGIS/releases/latest",
+      "codeRepository": "https://github.com/rohan1252030019-netizen/AEGIS",
       "programmingLanguage": ["Python", "TypeScript", "Rust"],
       "keywords": [
         "open source EDR",
@@ -602,23 +629,23 @@ Paste this block into any HTML landing page <head> to enable rich results.
       "mainEntity": [
         {
           "@type": "Question",
-          "name": "What is AEGIS cybersecurity?",
+          "name": "What is Ram Antivirus cybersecurity?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "AEGIS is an open-source, self-hosted autonomous defense platform that detects ransomware, lateral movement, and intrusions in real time. It evaluates 168 Sigma rules + 6 chain detections in <1 ms, runs deception honeypots, and enforces firewall blocks via pfctl/iptables — all without requiring a cloud AI service."
+            "text": "Ram Antivirus is an open-source, self-hosted autonomous defense platform that detects ransomware, lateral movement, and intrusions in real time. It evaluates 168 Sigma rules + 6 chain detections in <1 ms, runs deception honeypots, and enforces firewall blocks via pfctl/iptables — all without requiring a cloud AI service."
           }
         },
         {
           "@type": "Question",
-          "name": "How does AEGIS detect ransomware?",
+          "name": "How does Ram Antivirus detect ransomware?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "AEGIS v1.6 ships 12 ransomware-specific Sigma rules + 1 kill-chain detection mapped to MITRE ATT&CK techniques T1490, T1486, T1105, T1218, and T1021. It detects shadow-copy deletion, mass file encryption (via write-event rate analysis), canary file trips, ransom note drops, LOLBin staging (certutil/rundll32), SMB lateral movement, and WinRM remote execution. Entropy-based analysis is in development. Events are evaluated in <1 ms using an O(1) type-indexed correlation engine."
+            "text": "Ram Antivirus v1.6 ships 12 ransomware-specific Sigma rules + 1 kill-chain detection mapped to MITRE ATT&CK techniques T1490, T1486, T1105, T1218, and T1021. It detects shadow-copy deletion, mass file encryption (via write-event rate analysis), canary file trips, ransom note drops, LOLBin staging (certutil/rundll32), SMB lateral movement, and WinRM remote execution. Entropy-based analysis is in development. Events are evaluated in <1 ms using an O(1) type-indexed correlation engine."
           }
         },
         {
           "@type": "Question",
-          "name": "Can AEGIS run without an internet connection or AI API key?",
+          "name": "Can Ram Antivirus run without an internet connection or AI API key?",
           "acceptedAnswer": {
             "@type": "Answer",
             "text": "Yes. Set AEGIS_AI_MODE=disabled and the entire stack runs on deterministic Sigma rules, Jinja2 templates, and static playbooks. No LLM call is made. The RaaS intel feed falls back to its on-disk cache. All detection, blocking, and recovery functions continue to operate."
@@ -626,18 +653,18 @@ Paste this block into any HTML landing page <head> to enable rich results.
         },
         {
           "@type": "Question",
-          "name": "How does AEGIS compare to Wazuh or Elastic Security?",
+          "name": "How does Ram Antivirus compare to Wazuh or Elastic Security?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "AEGIS offers <1 ms in-memory Sigma evaluation versus 5–60 s pipeline latency in Wazuh or Elastic. It ships with a ransomware kill-chain out of the box, SSH/HTTP honeypots, and RaaS threat intel — none of which are available in Wazuh or OSSEC by default. Snapshot recovery orchestration is in development. Deployment is a single `docker compose up -d` versus multi-node agent rollout for Wazuh or weeks of Elasticsearch setup."
+            "text": "Ram Antivirus offers <1 ms in-memory Sigma evaluation versus 5–60 s pipeline latency in Wazuh or Elastic. It ships with a ransomware kill-chain out of the box, SSH/HTTP honeypots, and RaaS threat intel — none of which are available in Wazuh or OSSEC by default. Snapshot recovery orchestration is in development. Deployment is a single `docker compose up -d` versus multi-node agent rollout for Wazuh or weeks of Elasticsearch setup."
           }
         },
         {
           "@type": "Question",
-          "name": "Is AEGIS free and open source?",
+          "name": "Is Ram Antivirus free and open source?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. AEGIS is licensed under AGPL-3.0. The public repository includes ransomware detection, honeypots, Sigma rules, firewall enforcement, and recovery orchestration as open-source components. Core capabilities run fully offline without external dependencies."
+            "text": "Yes. Ram Antivirus is licensed under AGPL-3.0. The public repository includes ransomware detection, honeypots, Sigma rules, firewall enforcement, and recovery orchestration as open-source components. Core capabilities run fully offline without external dependencies."
           }
         }
       ]
@@ -649,6 +676,6 @@ Paste this block into any HTML landing page <head> to enable rich results.
 
 <div align="center">
 
-Built by the AEGIS contributors · [GitHub](https://github.com/alejadxr/AEGIS) · [Releases](https://github.com/alejadxr/AEGIS/releases) · AGPL-3.0
+Built by the Ram Antivirus contributors · [GitHub](https://github.com/rohan1252030019-netizen/AEGIS) · [Releases](https://github.com/rohan1252030019-netizen/AEGIS/releases) · AGPL-3.0
 
 </div>

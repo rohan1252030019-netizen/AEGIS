@@ -1629,7 +1629,7 @@ pub fn run() {
             let _tray = TrayIconBuilder::new()
                 .icon(tray_icon)
                 .menu(&menu)
-                .tooltip("AEGIS Node")
+                .tooltip("Ram Antivirus Node")
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {

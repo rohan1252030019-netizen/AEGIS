@@ -166,7 +166,7 @@ function LoginCard() {
             <div className="grid place-items-center h-9 w-9 rounded-xl bg-[#F97316]/15 border border-[#F97316]/30 text-[#F97316]">
               <ShieldCheck size={18} strokeWidth={2.25} />
             </div>
-            <span className="text-2xl font-semibold tracking-[-0.02em] text-foreground">AEGIS</span>
+            <span className="text-2xl font-semibold tracking-[-0.02em] text-foreground">Ram Antivirus</span>
           </div>
           <p className="text-[13px] text-muted-foreground/85 leading-snug max-w-[300px]">
             {mode === 'apikey'
@@ -342,7 +342,7 @@ function LoginCard() {
               <ArrowRight size={11} aria-hidden />
             </Link>
             <a
-              href="https://github.com/alejadxr/AEGIS#api-keys"
+              href="https://github.com/rohan1252030019-netizen/AEGIS#api-keys"
               target="_blank"
               rel="noreferrer noopener"
               className="hover:text-foreground transition-colors"

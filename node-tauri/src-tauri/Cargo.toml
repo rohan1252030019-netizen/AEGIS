@@ -1,8 +1,8 @@
 [package]
 name = "aegis_node"
 version = "0.1.0"
-description = "AEGIS Node Agent — lightweight endpoint monitor"
-authors = ["AEGIS"]
+description = "Ram Antivirus Node Agent — lightweight endpoint monitor"
+authors = ["Ram Antivirus"]
 license = "UNLICENSED"
 edition = "2021"
 rust-version = "1.77.2"

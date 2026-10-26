@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AEGIS",
+  "productName": "Ram Antivirus",
   "version": "1.6.2",
   "identifier": "com.aegis.desktop",
   "build": {
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "AEGIS",
+        "title": "Ram Antivirus",
         "width": 800,
         "height": 600,
         "resizable": true,

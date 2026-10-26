@@ -164,7 +164,7 @@ export default function DosShieldPage() {
             <EmptyState
               icon={<ShieldAlert className="w-8 h-8" />}
               title="DoS Shield unavailable"
-              description="The rate-limiting engine is not initialized on this instance. Enable it in the AEGIS configuration to begin monitoring."
+              description="The rate-limiting engine is not initialized on this instance. Enable it in the Ram Antivirus configuration to begin monitoring."
               size="lg"
             />
           </CardContent>

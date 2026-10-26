@@ -1,4 +1,5 @@
 'use client';
+import { getAuthHeaders } from '@/lib/api';
 
 import { useState, useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -35,9 +36,8 @@ export function RecentEventsTable({ onSelectEvent }: RecentEventsTableProps) {
     setLoading(true);
     setError(false);
     try {
-      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aegis_api_key') : null;
       const res = await fetch('/api/v1/threats/events?type=ransomware&limit=50', {
-        headers: apiKey ? { 'X-API-Key': apiKey } : {},
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();

@@ -179,7 +179,7 @@ function CampaignsPageInner() {
           <EmptyState
             icon={<Target02Icon size={28} aria-hidden />}
             title="No campaigns matched"
-            description={`AEGIS detects clusters when ≥ ${filters.minIps} distinct IPs trigger the same MITRE technique within the time window. Loosen filters or wait for more data.`}
+            description={`Ram Antivirus detects clusters when ≥ ${filters.minIps} distinct IPs trigger the same MITRE technique within the time window. Loosen filters or wait for more data.`}
             size="md"
           />
         </Panel>

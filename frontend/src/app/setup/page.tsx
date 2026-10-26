@@ -212,7 +212,7 @@ export default function SetupWizard() {
 
   const reportBackendDown = (retry: () => void) => {
     setBackendError(
-      `Cannot reach AEGIS API at ${API_BASE}. Make sure cayde6-api is running.`
+      `Cannot reach Ram Antivirus API at ${API_BASE}. Make sure cayde6-api is running.`
     );
     retryActionRef.current = retry;
   };
@@ -835,7 +835,7 @@ export default function SetupWizard() {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--brand)]/10 border border-[var(--brand)]/20 mb-4">
                   <ShieldCheck className="w-6 h-6 text-[var(--brand)]" />
                 </div>
-                <h2 className="text-2xl font-bold text-white">Welcome to AEGIS</h2>
+                <h2 className="text-2xl font-bold text-white">Welcome to Ram Antivirus</h2>
                 <p className="text-zinc-500 text-sm mt-2">
                   {state.loginMode ? 'Login to your existing account' : 'Set up your account to get started'}
                 </p>
@@ -951,7 +951,7 @@ export default function SetupWizard() {
                   <Cpu className="w-6 h-6 text-[var(--brand)]" />
                 </div>
                 <h2 className="text-2xl font-bold text-white">Connect AI Provider</h2>
-                <p className="text-zinc-500 text-sm mt-2">AEGIS uses AI for threat analysis and autonomous response</p>
+                <p className="text-zinc-500 text-sm mt-2">Ram Antivirus uses AI for threat analysis and autonomous response</p>
               </div>
 
               <div className="space-y-2">
@@ -1067,7 +1067,7 @@ export default function SetupWizard() {
                       <AlertTriangle className="w-5 h-5 text-[var(--warning)] flex-shrink-0 mt-0.5" />
                       <div className="space-y-2">
                         <p className="text-sm text-zinc-300">
-                          AEGIS will scan your network to discover services.
+                          Ram Antivirus will scan your network to discover services.
                           This runs nmap from the server to detect open ports and services.
                         </p>
                         <p className="text-xs text-zinc-500">
@@ -1451,7 +1451,7 @@ export default function SetupWizard() {
                   <Bell className="w-6 h-6 text-[var(--brand)]" />
                 </div>
                 <h2 className="text-2xl font-bold text-white">Configure Alerts</h2>
-                <p className="text-zinc-500 text-sm mt-2">Get notified when AEGIS detects threats</p>
+                <p className="text-zinc-500 text-sm mt-2">Get notified when Ram Antivirus detects threats</p>
               </div>
 
               {/* Webhook */}
@@ -1547,7 +1547,7 @@ export default function SetupWizard() {
                   <Share2 className="w-6 h-6 text-[var(--brand)]" />
                 </div>
                 <h2 className="text-2xl font-bold text-white">Threat Intelligence</h2>
-                <p className="text-zinc-500 text-sm mt-2">Share and receive threat data from the AEGIS community</p>
+                <p className="text-zinc-500 text-sm mt-2">Share and receive threat data from the Ram Antivirus community</p>
               </div>
 
               <div className={`p-5 rounded-xl border transition-all duration-200 ${
@@ -1563,7 +1563,7 @@ export default function SetupWizard() {
                     <Share2 className={`w-4 h-4 ${state.intelSharingEnabled ? 'text-[var(--brand)]' : 'text-zinc-500'}`} />
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-white">Share Threat Intelligence with AEGIS Community</div>
+                    <div className="text-sm font-medium text-white">Share Threat Intelligence with Ram Antivirus Community</div>
                     <div className="text-xs text-zinc-500 mt-1">
                       When enabled, anonymized threat indicators are shared with the community.
                       No personal data leaves your system.
@@ -1681,7 +1681,7 @@ export default function SetupWizard() {
 
         {/* Footer */}
         <p className="text-center text-xs text-zinc-700 mt-8">
-          AEGIS Defense Platform &middot; v{process.env.NEXT_PUBLIC_AEGIS_VERSION || '1.6.2'}
+          Ram Antivirus &middot; v{process.env.NEXT_PUBLIC_AEGIS_VERSION || '1.6.2'}
         </p>
       </div>
 

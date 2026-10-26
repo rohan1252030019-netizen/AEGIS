@@ -741,7 +741,7 @@ export default function ResponsePage() {
           <Panel>
             <SectionHeader
               title="Autonomous Response Configuration"
-              subtitle="· control which actions AEGIS executes automatically"
+              subtitle="· control which actions Ram Antivirus executes automatically"
             />
             <div>
               {Object.keys(guardrails).length === 0 ? (

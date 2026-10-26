@@ -2,7 +2,7 @@
 name = "aegis-agent-rust"
 version = "0.1.0"
 edition = "2021"
-description = "AEGIS EDR-lite endpoint agent — Rust prototype"
+description = "Ram Antivirus EDR-lite endpoint agent — Rust prototype"
 license = "MIT"
 
 [lib]

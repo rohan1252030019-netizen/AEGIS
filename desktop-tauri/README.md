@@ -1,4 +1,4 @@
-# AEGIS Desktop (Tauri)
+# Ram Antivirus Desktop (Tauri)
 
 Starter wrapper to run the existing Next.js UI inside a Tauri shell for local testing.
 

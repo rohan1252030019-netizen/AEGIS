@@ -1,4 +1,5 @@
 'use client';
+import { getAuthHeaders } from '@/lib/api';
 
 import { useState } from 'react';
 import { Search01Icon } from 'hugeicons-react';
@@ -36,9 +37,8 @@ export function DecryptorLookup() {
     setError(false);
     setResults(null);
     try {
-      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aegis_api_key') : null;
       const res = await fetch(`/api/v1/ransomware/decryptors?file_extension=${encodeURIComponent(ext)}`, {
-        headers: apiKey ? { 'X-API-Key': apiKey } : {},
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: DecryptorApiResponse = await res.json();

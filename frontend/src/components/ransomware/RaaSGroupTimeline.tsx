@@ -1,4 +1,5 @@
 'use client';
+import { getAuthHeaders } from '@/lib/api';
 
 import { useState, useEffect } from 'react';
 import {
@@ -49,9 +50,8 @@ export function RaaSGroupTimeline() {
     setLoading(true);
     setError(false);
     try {
-      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aegis_api_key') : null;
       const res = await fetch('/api/v1/ransomware/raas-groups', {
-        headers: apiKey ? { 'X-API-Key': apiKey } : {},
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: RaaSApiResponse = await res.json();

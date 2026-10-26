@@ -1,4 +1,4 @@
-# Contributing to AEGIS
+# Contributing to Ram Antivirus
 
 We welcome contributions! See our [GitHub Issues](../../issues) for open tasks.
 

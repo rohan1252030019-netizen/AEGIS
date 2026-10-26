@@ -594,7 +594,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h3 className="text-[13px] font-medium text-foreground">AI Configuration Assistant</h3>
-              <p className="text-[11px] text-muted-foreground">Configure AEGIS using natural language</p>
+              <p className="text-[11px] text-muted-foreground">Configure Ram Antivirus using natural language</p>
             </div>
           </div>
 
@@ -618,7 +618,7 @@ export default function SettingsPage() {
               <div className="w-12 h-12 rounded-xl bg-white/[0.02] flex items-center justify-center mx-auto mb-3">
                 <Sparkles className="w-5 h-5 text-muted-foreground/60" />
               </div>
-              <p className="text-[13px] text-muted-foreground/60">Ask AEGIS to configure your security platform</p>
+              <p className="text-[13px] text-muted-foreground/60">Ask Ram Antivirus to configure your security platform</p>
               <p className="text-[11px] text-muted-foreground/60 mt-1">Try clicking a quick action above to get started</p>
             </div>
           )}
@@ -655,7 +655,7 @@ export default function SettingsPage() {
             <div className="flex justify-start">
               <div className="bg-white/[0.02] rounded-xl rounded-bl-md px-4 py-3">
                 <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                  <span>AEGIS is thinking</span>
+                  <span>Ram Antivirus is thinking</span>
                   <span className="inline-flex gap-0.5">
                     <span className="w-1 h-1 rounded-full bg-[var(--brand)] animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1 h-1 rounded-full bg-[var(--brand)] animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -677,7 +677,7 @@ export default function SettingsPage() {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={handleChatKeyDown}
-              placeholder="Tell AEGIS what to configure..."
+              placeholder="Tell Ram Antivirus what to configure..."
               className="flex-1"
             />
             <Button
@@ -1022,7 +1022,7 @@ export default function SettingsPage() {
               {[
                 { key: 'notify_on_critical' as const, label: 'Critical severity incidents', description: 'CVSS 9.0+ or active exploitation detected', icon: Shield },
                 { key: 'notify_on_high' as const, label: 'High severity incidents', description: 'CVSS 7.0+ threats requiring attention', icon: BellRing },
-                { key: 'notify_on_actions' as const, label: 'Autonomous actions executed', description: 'When AEGIS takes automated response actions', icon: Zap },
+                { key: 'notify_on_actions' as const, label: 'Autonomous actions executed', description: 'When Ram Antivirus takes automated response actions', icon: Zap },
                 { key: 'notify_on_scan_completed' as const, label: 'Scan completed', description: 'When a scheduled or manual scan finishes', icon: Radar01Icon },
               ].map((item, index) => (
                 <div key={item.key} className={cn(index < 3 && 'border-b border-white/[0.02]')}>
@@ -1106,7 +1106,7 @@ export default function SettingsPage() {
       <TabsContent value="apikeys">
         <SectionCard
           title="API Key Management"
-          description="Your API key is used to authenticate with the AEGIS platform"
+          description="Your API key is used to authenticate with the Ram Antivirus platform"
         >
           <div className="p-4 sm:p-6 space-y-4">
             <div>
@@ -1155,7 +1155,7 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <SectionCard
             title="Threat Intelligence Sharing"
-            description="Join the AEGIS threat sharing network"
+            description="Join the Ram Antivirus threat sharing network"
             headerRight={
               <div className="flex items-center gap-3">
                 <span className={cn(
@@ -1200,7 +1200,7 @@ export default function SettingsPage() {
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-                When enabled, AEGIS will share validated IOCs with the threat sharing network and automatically
+                When enabled, Ram Antivirus will share validated IOCs with the threat sharing network and automatically
                 receive indicators from other nodes. Incoming IOCs are validated before being applied.
                 High-confidence threats are auto-blocked based on your guardrail settings.
               </p>
@@ -1209,7 +1209,7 @@ export default function SettingsPage() {
 
           <SectionCard
             title="Threat Sharing Hub"
-            description="Share and receive threat intelligence across AEGIS instances in real-time"
+            description="Share and receive threat intelligence across Ram Antivirus instances in real-time"
             headerRight={
               <StatusDot connected={true} label="Hub Online" />
             }
@@ -1332,7 +1332,7 @@ export default function SettingsPage() {
             <div className="p-4 sm:p-6 space-y-4">
               <div className="bg-white/[0.02] border border-border rounded-xl p-4">
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  <span className="text-foreground font-medium">To connect a remote AEGIS instance:</span> Set the
+                  <span className="text-foreground font-medium">To connect a remote Ram Antivirus instance:</span> Set the
                   <span className="text-[var(--brand)] font-mono text-[10px] mx-1">AEGIS_HUB_URL</span>
                   environment variable in the remote node{"'"}s <span className="font-mono text-[10px]">.env</span> file to
                   <span className="text-[var(--brand)] font-mono text-[10px] ml-1">https://api-aegis.somoswilab.com</span>.
@@ -1343,7 +1343,7 @@ export default function SettingsPage() {
               <div>
                 <label className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider block mb-1.5">Example .env configuration</label>
                 <div className="bg-[#09090B] border border-border rounded-xl p-4 font-mono text-[11px] text-muted-foreground leading-relaxed">
-                  <div><span className="text-muted-foreground/40"># Connect to the AEGIS threat sharing hub</span></div>
+                  <div><span className="text-muted-foreground/40"># Connect to the Ram Antivirus threat sharing hub</span></div>
                   <div><span className="text-[var(--brand)]">AEGIS_HUB_URL</span>=https://api-aegis.somoswilab.com</div>
                   <div className="mt-2"><span className="text-muted-foreground/40"># MongoDB Atlas for shared intel storage</span></div>
                   <div><span className="text-[var(--brand)]">AEGIS_MONGODB_URI</span>=mongodb+srv://...</div>
@@ -1355,7 +1355,7 @@ export default function SettingsPage() {
                 <div className="bg-[#09090B] border border-border rounded-xl p-4 font-mono text-[11px] text-muted-foreground leading-relaxed overflow-x-auto">
                   <div>curl -X POST https://api-aegis.somoswilab.com/api/v1/threats/nodes/register \</div>
                   <div className="pl-4">-H &quot;Content-Type: application/json&quot; \</div>
-                  <div className="pl-4">-d {"'{\"node_id\": \"my-node-01\", \"node_name\": \"Office AEGIS\"}'"};</div>
+                  <div className="pl-4">-d {"'{\"node_id\": \"my-node-01\", \"node_name\": \"Office Ram Antivirus\"}'"};</div>
                 </div>
               </div>
             </div>
@@ -1364,11 +1364,11 @@ export default function SettingsPage() {
       </TabsContent>
 
       <TabsContent value="guide">
-        <SectionCard title="AEGIS Feature Guide" description="Everything AEGIS can do for you. Click a module to navigate.">
+        <SectionCard title="Ram Antivirus Feature Guide" description="Everything Ram Antivirus can do for you. Click a module to navigate.">
           <div className="mb-4 p-4 rounded-xl border border-border bg-muted/30 flex items-center justify-between">
             <div>
               <p className="text-[13px] font-medium text-foreground">Interactive Feature Tour</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Walk through all AEGIS modules step by step</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Walk through all Ram Antivirus modules step by step</p>
             </div>
             <button
               onClick={() => {
@@ -1387,7 +1387,7 @@ export default function SettingsPage() {
               { icon: Globe, name: 'Surface (ASM)', desc: 'Attack surface management. AI-powered asset discovery via nmap, vulnerability scanning with Nuclei, SBOM analysis, risk scoring, and scheduled scans.', href: '/dashboard/surface', color: '#34D399', free: true },
               { icon: Zap, name: 'Response (SOAR)', desc: 'Autonomous incident response. 18\u03BCs fast path, 10 playbooks, AI triage with MITRE ATT&CK mapping. All actions auto-approved by default \u2014 override per guardrail.', href: '/dashboard/response', color: '#F87171', free: true },
               { icon: Bug, name: 'Phantom (Deception)', desc: 'SSH + HTTP honeypots with breadcrumb traps. Attacker steals fake credentials \u2192 tries on real API \u2192 CRITICAL alert + auto-block.', href: '/dashboard/phantom', color: 'var(--brand-accent)', free: true },
-              { icon: Shield, name: 'Threats (TIP)', desc: '5 threat feeds, STIX 2.1 export, Intel Cloud hub for sharing IOCs across AEGIS instances. Campaign tracking detects coordinated multi-phase attacks.', href: '/dashboard/threats', color: '#FBBF24', free: true },
+              { icon: Shield, name: 'Threats (TIP)', desc: '5 threat feeds, STIX 2.1 export, Intel Cloud hub for sharing IOCs across Ram Antivirus instances. Campaign tracking detects coordinated multi-phase attacks.', href: '/dashboard/threats', color: '#FBBF24', free: true },
               { icon: Fingerprint, name: 'EDR/XDR Core', desc: 'Endpoint detection and response. ETW (Windows) + eBPF (Linux) telemetry, process tree reconstruction, 6 MITRE attack chain detection rules.', href: '/dashboard/edr', color: '#A78BFA', free: true },
               { icon: Flame, name: 'Ransomware Protection', desc: 'Canary files + entropy detection + process kill in <500ms. Auto-rollback via VSS (Windows) or Btrfs/LVM snapshots (Linux).', href: '/dashboard/response', color: 'var(--danger)', free: true },
               { icon: Radar, name: 'Antivirus Engine', desc: 'YARA + ClamAV signature scanning, hash reputation cache, encrypted quarantine. On-access + daily scheduled scans. Auto-updates from YARA-Forge.', href: '/dashboard/antivirus', color: 'var(--brand)', free: true },

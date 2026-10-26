@@ -207,7 +207,7 @@ export default function ThreatSharingPage() {
             Threat Sharing
           </h1>
           <p className="text-[13px] text-muted-foreground mt-1 max-w-[68ch]">
-            Community IOC sharing — anonymized indicators propagate to all AEGIS deployments. More instances = stronger collective defense.
+            Community IOC sharing — anonymized indicators propagate to all Ram Antivirus deployments. More instances = stronger collective defense.
           </p>
         </div>
       </header>
@@ -217,7 +217,7 @@ export default function ThreatSharingPage() {
         <Panel variant="default" padding="sm" as="div">
           <p className="text-[12px] text-[var(--brand-accent)] font-medium flex items-center gap-2">
             <CheckCircle2 size={14} aria-hidden />
-            Hub mode — this instance is the community hub. IOCs submitted here are served to all AEGIS clients.
+            Hub mode — this instance is the community hub. IOCs submitted here are served to all Ram Antivirus clients.
           </p>
         </Panel>
       ) : (
@@ -470,7 +470,7 @@ export default function ThreatSharingPage() {
             title="No community IOCs yet"
             description={
               sharingEnabled
-                ? 'IOCs from other AEGIS instances will appear here after the next sync cycle (every 15 min).'
+                ? 'IOCs from other Ram Antivirus instances will appear here after the next sync cycle (every 15 min).'
                 : 'Enable intel sharing above and sync to receive community indicators.'
             }
             size="md"

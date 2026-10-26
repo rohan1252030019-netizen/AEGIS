@@ -24,23 +24,23 @@ const STEPS: TourStep[] = [
   {
     icon: BookOpen,
     color: 'var(--brand)',
-    title: 'Welcome to AEGIS',
+    title: 'Welcome to Ram Antivirus',
     subtitle: 'Your autonomous cybersecurity platform',
-    description: 'AEGIS detects, analyzes, and neutralizes cyber threats without human intervention. From the moment you deploy it, 5 detection layers work simultaneously to protect your infrastructure.',
+    description: 'Ram Antivirus detects, analyzes, and neutralizes cyber threats without human intervention. From the moment you deploy it, 5 detection layers work simultaneously to protect your infrastructure.',
     highlights: [
       'Everything runs autonomously — zero human approval needed',
       '18-microsecond detection in the first layer',
       '11/11 verified attack detection score',
       'Self-hosted: your data never leaves your servers',
     ],
-    tip: 'AEGIS works out of the box. The AI features activate when you add an OpenRouter or Ollama API key in Settings.',
+    tip: 'Ram Antivirus works out of the box. The AI features activate when you add an OpenRouter or Ollama API key in Settings.',
     action: { label: 'Continue the tour', href: '' },
   },
   {
     icon: Layers,
     color: 'var(--brand)',
     title: 'The 5-Layer Pipeline',
-    subtitle: 'How AEGIS catches everything',
+    subtitle: 'How Ram Antivirus catches everything',
     description: 'Every request to your server passes through 5 detection layers. Each layer catches what the previous one missed. The fast path resolves known threats in <300ms without even calling the AI.',
     highlights: [
       'L1: Attack Detector — regex + URL decode on every request (18us)',
@@ -82,15 +82,15 @@ const STEPS: TourStep[] = [
       'Scheduled scans: full every 2 hours, quick every 30 minutes',
       'Hardening checks with step-by-step remediation',
     ],
-    tip: 'Start here. Put your server IP in the scan field and let AEGIS discover what you are running. The AI will tell you what it found.',
+    tip: 'Start here. Put your server IP in the scan field and let Ram Antivirus discover what you are running. The AI will tell you what it found.',
     action: { label: 'Scan your network', href: '/dashboard/surface' },
   },
   {
     icon: Zap,
     color: '#F87171',
     title: 'Response — Autonomous Incident Response',
-    subtitle: 'AEGIS acts. You review.',
-    description: 'When a threat is detected, AEGIS does not wait for you. It classifies the threat, decides the response, executes it, verifies it worked, and logs everything — all in seconds. Every AI decision includes reasoning, confidence score, and token cost.',
+    subtitle: 'Ram Antivirus acts. You review.',
+    description: 'When a threat is detected, Ram Antivirus does not wait for you. It classifies the threat, decides the response, executes it, verifies it worked, and logs everything — all in seconds. Every AI decision includes reasoning, confidence score, and token cost.',
     highlights: [
       '10 deterministic playbooks execute in <50ms each',
       'AI triage: classify -> decide -> execute -> verify -> audit',
@@ -106,7 +106,7 @@ const STEPS: TourStep[] = [
     color: 'var(--brand-accent)',
     title: 'Phantom — Honeypot Deception',
     subtitle: 'Trap attackers with fake services',
-    description: 'AEGIS deploys fake SSH servers and web applications that look real. When an attacker connects, it captures their credentials, commands, and tools. The killer feature: breadcrumb traps — fake .env files with trap API keys. When the attacker tries those keys on your real API, AEGIS instantly knows.',
+    description: 'Ram Antivirus deploys fake SSH servers and web applications that look real. When an attacker connects, it captures their credentials, commands, and tools. The killer feature: breadcrumb traps — fake .env files with trap API keys. When the attacker tries those keys on your real API, Ram Antivirus instantly knows.',
     highlights: [
       'SSH honeypot on port 2222 — captures credentials and commands',
       'HTTP honeypot on port 8888 — rotates WordPress/Jenkins/phpMyAdmin',
@@ -122,7 +122,7 @@ const STEPS: TourStep[] = [
     color: 'var(--danger)',
     title: 'Ransomware Protection',
     subtitle: 'Detect, kill, and rollback in <500ms',
-    description: 'The Rust node agent plants 10 hidden canary files across your user directories. If ransomware tries to encrypt them, AEGIS kills the entire process tree instantly and restores the affected files from shadow copies — all before the ransomware can finish.',
+    description: 'The Rust node agent plants 10 hidden canary files across your user directories. If ransomware tries to encrypt them, Ram Antivirus kills the entire process tree instantly and restores the affected files from shadow copies — all before the ransomware can finish.',
     highlights: [
       '10 hidden canary files in Documents/Desktop/Downloads',
       'Shannon entropy detection: >7.5 bits = encryption suspected',
@@ -131,7 +131,7 @@ const STEPS: TourStep[] = [
       'Auto-rollback: VSS (Windows), Btrfs/LVM (Linux)',
       'Complete forensic chain uploaded as CRITICAL incident',
     ],
-    tip: 'This runs on the endpoint agent, not the server. Install the AEGIS Node Agent on every machine you want to protect.',
+    tip: 'This runs on the endpoint agent, not the server. Install the Ram Antivirus Node Agent on every machine you want to protect.',
     action: { label: 'View response', href: '/dashboard/response' },
   },
   {
@@ -139,7 +139,7 @@ const STEPS: TourStep[] = [
     color: '#A78BFA',
     title: 'EDR/XDR Core',
     subtitle: 'See everything. Miss nothing.',
-    description: 'Enterprise endpoint detection using kernel-level telemetry. On Windows, AEGIS reads ETW (Event Tracing for Windows) for every process, network connection, and file write. On Linux, it uses eBPF programs. The backend reconstructs the full process tree so you can trace any attack chain.',
+    description: 'Enterprise endpoint detection using kernel-level telemetry. On Windows, Ram Antivirus reads ETW (Event Tracing for Windows) for every process, network connection, and file write. On Linux, it uses eBPF programs. The backend reconstructs the full process tree so you can trace any attack chain.',
     highlights: [
       'ETW: Kernel-Process, Network, File, Registry, AMSI (Windows)',
       'eBPF: process exec, connect, openat, unlink (Linux)',
@@ -172,7 +172,7 @@ const STEPS: TourStep[] = [
     color: 'var(--brand-accent)',
     title: 'Honey-AI — Deception at Scale',
     subtitle: 'The killer differentiator',
-    description: 'Deploy 50+ fake services that look real — fake web apps, REST APIs, and MySQL databases, all with AI-generated content. Every fake asset embeds a tracking UUID. When an attacker steals data from a fake service and tries to use it on a real one, AEGIS links the two events and raises a CRITICAL alert.',
+    description: 'Deploy 50+ fake services that look real — fake web apps, REST APIs, and MySQL databases, all with AI-generated content. Every fake asset embeds a tracking UUID. When an attacker steals data from a fake service and tries to use it on a real one, Ram Antivirus links the two events and raises a CRITICAL alert.',
     highlights: [
       'Deploy entire deception campaigns with one click',
       '4 industry themes: fintech, healthcare, ecommerce, devops',
@@ -182,15 +182,15 @@ const STEPS: TourStep[] = [
       'Smart DB: MySQL wire protocol with fake schemas',
       'Breadcrumb UUID tracking across all fake assets',
     ],
-    tip: 'This is what makes AEGIS unique. No other platform generates entire fake infrastructures to waste attackers\' time and reveal their methods.',
+    tip: 'This is what makes Ram Antivirus unique. No other platform generates entire fake infrastructures to waste attackers\' time and reveal their methods.',
     action: { label: 'Build a campaign', href: '/dashboard/deception' },
   },
   {
     icon: Crown,
     color: '#FBBF24',
     title: 'You are ready.',
-    subtitle: 'AEGIS is protecting you now.',
-    description: 'Everything is autonomous. AEGIS is already watching your infrastructure, correlating events, profiling attackers, and executing response actions. Open the Dashboard to see it in action.',
+    subtitle: 'Ram Antivirus is protecting you now.',
+    description: 'Everything is autonomous. Ram Antivirus is already watching your infrastructure, correlating events, profiling attackers, and executing response actions. Open the Dashboard to see it in action.',
     highlights: [
       'Open the Dashboard and watch threats arrive in real time',
       'Run a network scan in Surface to discover your assets',
@@ -347,7 +347,7 @@ export function GuideTour({ onClose }: { onClose: () => void }) {
                 className="flex items-center gap-2 text-[13px] font-semibold text-[#09090B] px-5 py-2.5 rounded-xl transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: current.color }}
               >
-                {isLast ? 'Start Using AEGIS' : 'Next'}
+                {isLast ? 'Start Using Ram Antivirus' : 'Next'}
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

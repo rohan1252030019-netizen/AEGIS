@@ -208,14 +208,14 @@ export function TopNav() {
         <Link
           href="/dashboard"
           className="tap-44 flex items-center gap-2.5 shrink-0 group min-h-[44px] md:min-h-0"
-          aria-label="AEGIS home"
+          aria-label="Ram Antivirus home"
         >
           <div className="relative w-7 h-7 rounded-md bg-gradient-to-br from-[color-mix(in_oklab,var(--brand-accent)_30%,transparent)] to-[color-mix(in_oklab,var(--brand-accent)_5%,transparent)] border border-[color-mix(in_oklab,var(--brand-accent)_35%,transparent)] flex items-center justify-center shrink-0">
             <span className="font-mono text-[var(--brand-accent)] font-bold text-[11px] tracking-wider">A</span>
             <span className="absolute inset-0 rounded-md bg-[color-mix(in_oklab,var(--brand-accent)_12%,transparent)] blur-md opacity-60 -z-10" />
           </div>
           <div className="flex items-baseline gap-1.5 min-w-0">
-            <span className="text-foreground font-semibold text-[14px] tracking-tight">AEGIS</span>
+            <span className="text-foreground font-semibold text-[14px] tracking-tight">Ram Antivirus</span>
             {process.env.NEXT_PUBLIC_AEGIS_VERSION && (
               <span className="hidden sm:inline text-[9px] font-mono text-muted-foreground/60 tracking-widest uppercase">
                 v{process.env.NEXT_PUBLIC_AEGIS_VERSION}

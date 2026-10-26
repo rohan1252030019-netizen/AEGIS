@@ -146,7 +146,7 @@ export function CommandBar({
               entire left slot on a phone. */}
           <div className="hidden md:flex items-center gap-[10px] shrink-0">
             <span className="font-sans font-semibold text-[15px] tracking-[-0.4px] text-foreground">
-              AEGIS
+              Ram Antivirus
             </span>
             {version && (
               <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
@@ -209,7 +209,7 @@ export function CommandBar({
         >
           <div className="max-w-[1400px] mx-auto px-4 md:px-6 min-h-[44px] md:h-[34px] py-2 md:py-0 flex items-center justify-between gap-3 md:gap-4">
             <p className="text-[12px] leading-[16px] font-normal text-foreground line-clamp-2 md:truncate md:leading-normal">
-              New to AEGIS? An 11-step walkthrough explains every module.{' '}
+              New to Ram Antivirus? An 11-step walkthrough explains every module.{' '}
               <Link
                 href="/dashboard/guide"
                 className="font-semibold text-[var(--brand-text,var(--brand))] underline-offset-2 hover:underline"

@@ -428,7 +428,7 @@ function EnrollmentModal({ open, onClose, onEnrolled }: { open: boolean; onClose
         <div className="space-y-6">
           <div className="space-y-4">
             <p className="text-[13px] text-muted-foreground leading-relaxed">
-              Follow these steps to connect a new machine to your AEGIS network:
+              Follow these steps to connect a new machine to your Ram Antivirus network:
             </p>
 
             <div className="flex gap-3">
@@ -437,13 +437,13 @@ function EnrollmentModal({ open, onClose, onEnrolled }: { open: boolean; onClose
               </div>
               <div>
                 <p className="text-[13px] text-foreground font-medium mb-2">
-                  Download the AEGIS Node app on the target machine
+                  Download the Ram Antivirus Node app on the target machine
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {([
-                    ['Windows', 'https://github.com/alejadxr/AEGIS/releases/latest/download/AEGIS_x64-setup.exe'],
-                    ['macOS', 'https://github.com/alejadxr/AEGIS/releases/latest/download/AEGIS_aarch64.dmg'],
-                    ['Linux', 'https://github.com/alejadxr/AEGIS/releases/latest/download/AEGIS_amd64.AppImage'],
+                    ['Windows', 'https://github.com/rohan1252030019-netizen/AEGIS/releases/latest/download/AEGIS_x64-setup.exe'],
+                    ['macOS', 'https://github.com/rohan1252030019-netizen/AEGIS/releases/latest/download/AEGIS_aarch64.dmg'],
+                    ['Linux', 'https://github.com/rohan1252030019-netizen/AEGIS/releases/latest/download/AEGIS_amd64.AppImage'],
                   ] as const).map(([os, url]) => (
                     <a
                       key={os}

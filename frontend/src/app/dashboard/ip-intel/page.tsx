@@ -1148,7 +1148,7 @@ export default function IPIntelPage() {
           <EmptyState
             icon={<Search01Icon size={32} />}
             title="Enter an IP address to investigate"
-            description="Same enrichment AEGIS attaches to every incident — manually queryable here."
+            description="Same enrichment Ram Antivirus attaches to every incident — manually queryable here."
             size="md"
           />
         </Panel>

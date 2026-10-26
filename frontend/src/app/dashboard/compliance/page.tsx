@@ -35,15 +35,15 @@ const FALLBACK_FRAMEWORKS: Framework[] = [
     controls: [
       { id: 'A.5', name: 'Information Security Policies', module: 'Settings / Guardrails', status: 'met', evidence: 'AI guardrails system with auto_approve / require_approval / never_auto policies configured' },
       { id: 'A.6', name: 'Organization of Information Security', module: 'Auth / RBAC', status: 'met', evidence: 'Multi-tenant architecture with API key auth, JWT tokens, and role-based access control' },
-      { id: 'A.7', name: 'Human Resource Security', module: '-', status: 'not_met', evidence: 'HR security controls are outside AEGIS scope' },
+      { id: 'A.7', name: 'Human Resource Security', module: '-', status: 'not_met', evidence: 'HR security controls are outside Ram Antivirus scope' },
       { id: 'A.8', name: 'Asset Management', module: 'Surface Scanner', status: 'met', evidence: 'Automated asset discovery via nmap, continuous scanning (full 2h, quick 30min, discovery 1h)' },
       { id: 'A.9', name: 'Access Control', module: 'Auth / RBAC', status: 'met', evidence: 'API key authentication, JWT sessions, middleware-level enforcement' },
       { id: 'A.10', name: 'Cryptography', module: 'Quantum Module', status: 'met', evidence: 'Post-quantum cryptography assessment, algorithm vulnerability timeline tracking' },
-      { id: 'A.11', name: 'Physical Security', module: '-', status: 'not_met', evidence: 'Physical security controls are outside AEGIS scope' },
+      { id: 'A.11', name: 'Physical Security', module: '-', status: 'not_met', evidence: 'Physical security controls are outside Ram Antivirus scope' },
       { id: 'A.12', name: 'Operations Security', module: 'Log Watcher / Scanner', status: 'met', evidence: 'PM2 log tailing for SQLi, XSS, brute force patterns; scheduled vulnerability scanning' },
       { id: 'A.13', name: 'Communications Security', module: 'NDR / DNS Monitor', status: 'met', evidence: 'Network traffic analysis, DNS monitoring, threat intelligence correlation' },
       { id: 'A.14', name: 'System Development Security', module: 'Surface / SBOM', status: 'met', evidence: 'SBOM scanning, technology fingerprinting, vulnerability assessment with nuclei' },
-      { id: 'A.15', name: 'Supplier Relationships', module: '-', status: 'not_met', evidence: 'Supplier management is outside AEGIS scope' },
+      { id: 'A.15', name: 'Supplier Relationships', module: '-', status: 'not_met', evidence: 'Supplier management is outside Ram Antivirus scope' },
       { id: 'A.16', name: 'Incident Management', module: 'Response Module', status: 'met', evidence: 'Autonomous AI-driven triage, classification, decision, execution, verification, and audit pipeline' },
       { id: 'A.17', name: 'Business Continuity', module: 'Infra / PM2', status: 'partial', evidence: 'PM2 process management with auto-restart, but no full DR/BCP implementation' },
       { id: 'A.18', name: 'Compliance', module: 'Compliance Dashboard', status: 'met', evidence: 'This compliance dashboard providing framework mapping and gap analysis' },
@@ -60,7 +60,7 @@ const FALLBACK_FRAMEWORKS: Framework[] = [
       { id: 'Art.21.d', name: 'Supply Chain Security', module: 'Surface / SBOM', status: 'partial', evidence: 'SBOM scanning and technology fingerprinting cover some supply chain risks' },
       { id: 'Art.21.e', name: 'Network & IS Acquisition/Dev', module: 'Surface Scanner', status: 'met', evidence: 'Vulnerability scanning with nuclei, asset discovery, port analysis' },
       { id: 'Art.21.f', name: 'Effectiveness Assessment', module: 'Phantom / Honeypots', status: 'met', evidence: 'Honeypot deception system validates detection capabilities against real attackers' },
-      { id: 'Art.21.g', name: 'Cybersecurity Hygiene & Training', module: '-', status: 'not_met', evidence: 'Training and hygiene programs are outside AEGIS scope' },
+      { id: 'Art.21.g', name: 'Cybersecurity Hygiene & Training', module: '-', status: 'not_met', evidence: 'Training and hygiene programs are outside Ram Antivirus scope' },
       { id: 'Art.21.h', name: 'Cryptography Policies', module: 'Quantum Module', status: 'met', evidence: 'Quantum readiness assessment, crypto algorithm timeline, PQC recommendations' },
       { id: 'Art.21.i', name: 'HR Security & Access Control', module: 'Auth / RBAC', status: 'met', evidence: 'Role-based access control, API key management, multi-tenant isolation' },
       { id: 'Art.21.j', name: 'Multi-factor Authentication', module: 'Auth', status: 'partial', evidence: 'API key + JWT auth implemented, MFA not yet enforced' },
@@ -297,7 +297,7 @@ export default function CompliancePage() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-border">
-                    {['Control ID', 'Control Name', 'AEGIS Module', 'Status', 'Evidence'].map(h => (
+                    {['Control ID', 'Control Name', 'Ram Antivirus Module', 'Status', 'Evidence'].map(h => (
                       <th key={h} className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest pb-3 pr-4 whitespace-nowrap">
                         {h}
                       </th>

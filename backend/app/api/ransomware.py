@@ -410,7 +410,7 @@ async def get_raas_groups(
                 ThreatIntel.threat_type.ilike("%ransomware%"),
             )
         )
-        .order_by(ThreatIntel.confidence.desc().nullslast(), ThreatIntel.last_seen.desc())
+        .order_by(ThreatIntel.confidence.desc(), ThreatIntel.last_seen.desc())
         .limit(200)
     )
     intel_rows = (await db.execute(intel_q)).scalars().all()

@@ -54,7 +54,7 @@
   "main": "electron/main.mjs",
   "build": {
     "appId": "com.aegis.security",
-    "productName": "AEGIS Security",
+    "productName": "Ram Antivirus",
     "asar": false,
     "files": [
       "electron/**/*",

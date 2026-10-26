@@ -1,4 +1,5 @@
 'use client';
+import { getAuthHeaders } from '@/lib/api';
 
 import { useState, useEffect } from 'react';
 import { ShieldX } from 'lucide-react';
@@ -50,9 +51,8 @@ export default function RansomwarePage() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const apiKey = localStorage.getItem('aegis_api_key');
         const res = await fetch('/api/v1/ransomware/stats', {
-          headers: apiKey ? { 'X-API-Key': apiKey } : {},
+          headers: getAuthHeaders(),
         });
         if (!res.ok) throw new Error();
         const json = await res.json();

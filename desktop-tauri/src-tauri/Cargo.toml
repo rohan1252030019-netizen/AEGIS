@@ -1,8 +1,8 @@
 [package]
 name = "aegis_desktop"
 version = "1.6.2"
-description = "AEGIS desktop app (Tauri)"
-authors = ["AEGIS"]
+description = "Ram Antivirus desktop app (Tauri)"
+authors = ["Ram Antivirus"]
 license = "UNLICENSED"
 repository = ""
 edition = "2021"

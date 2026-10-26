@@ -1,8 +1,8 @@
-# AEGIS Project Factsheet
+# Ram Antivirus Project Factsheet
 
 ## Project Identification
 - **Project Title:** Development of Threat Detection and Response System, EDR & MDR using Open Source
-- **Project Name:** AEGIS (Autonomous Endpoint Guard and Intelligence System)
+- **Project Name:** Ram Antivirus (Autonomous Endpoint Guard and Intelligence System)
 - **Codebase Version:** 1.6.4.9 / 1.6.5.1
 - **Academic Context:** Engineering Final Year / IND Capstone Project (2025–2026)
 - **License:** GNU Affero General Public License v3.0 (AGPL-3.0)
@@ -10,7 +10,7 @@
 ---
 
 ## Executive Summary
-AEGIS is an open-source, self-hosted autonomous cybersecurity platform designed to provide Endpoint Detection and Response (EDR) and centralized Security Operations Center (MDR-style) capabilities without relying on recurring commercial licenses or external cloud AI dependencies. It integrates deterministic rule evaluation, behavioral machine learning, automated response playbooks (SOAR), and privacy-preserving local large language models.
+Ram Antivirus is an open-source, self-hosted autonomous cybersecurity platform designed to provide Endpoint Detection and Response (EDR) and centralized Security Operations Center (MDR-style) capabilities without relying on recurring commercial licenses or external cloud AI dependencies. It integrates deterministic rule evaluation, behavioral machine learning, automated response playbooks (SOAR), and privacy-preserving local large language models.
 
 ---
 
@@ -86,7 +86,7 @@ Small-to-medium enterprises, academic institutions, and homelab environments are
 ---
 
 ## Verified Codebase Limitations
-1. **Reactive Ransomware Interception:** AEGIS does not implement a synchronous Windows kernel minifilter driver; fast ransomware can encrypt a limited batch of files prior to canary tripping and process termination.
+1. **Reactive Ransomware Interception:** Ram Antivirus does not implement a synchronous Windows kernel minifilter driver; fast ransomware can encrypt a limited batch of files prior to canary tripping and process termination.
 2. **User-Space Telemetry Boundary:** The Python agent relies on polling APIs (`psutil`), which can be bypassed by kernel rootkits or ephemeral processes executing entirely between 10-second polling intervals.
 3. **Absence of True ETW / eBPF:** Kernel event tracing (Windows ETW via `ferrisetw` or Linux eBPF via `aya`) is documented as a target architecture but is not yet compiled into the agent binaries.
 4. **Snapshot Recovery Platform Dependencies:** Snapshot restoration is functional on macOS (`tmutil`) and Linux (`btrfs`/`zfs`) when `AEGIS_REAL_RECOVERY=1` is explicitly asserted; Windows VSS recovery remains a stub.

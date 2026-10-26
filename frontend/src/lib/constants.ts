@@ -1,4 +1,4 @@
-export const APP_NAME = 'AEGIS';
+export const APP_NAME = 'Ram Antivirus';
 export const APP_DESCRIPTION = 'Autonomous Cybersecurity Defense Platform';
 
 export const NAV_ITEMS = [
