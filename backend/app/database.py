@@ -32,7 +32,7 @@ elif _is_mysql:
         echo=settings.AEGIS_ENV == "development",
         pool_size=10,
         max_overflow=20,
-        pool_pre_ping=True,
+        pool_pre_ping=False,
         pool_recycle=1800,
     )
 else:

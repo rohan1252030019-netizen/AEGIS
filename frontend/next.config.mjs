@@ -9,7 +9,7 @@ import path from 'path';
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://aegis-backend-q6ok.onrender.com';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
