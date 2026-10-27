@@ -223,10 +223,13 @@ class LiveWS {
 let _singleton: LiveWS | null = null;
 
 function buildWsUrl(): string {
-  let wsRoot = "ws://localhost:8000";
+  let wsRoot = "wss://aegis-backend-q6ok.onrender.com";
   if (typeof window !== "undefined") {
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    wsRoot = `${proto}//${window.location.host}`;
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      wsRoot = "ws://localhost:8000";
+    } else {
+      wsRoot = "wss://aegis-backend-q6ok.onrender.com";
+    }
   } else if (process.env.NEXT_PUBLIC_API_URL) {
     const root = process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, "");
     wsRoot = root.replace(/^http:/, "ws:").replace(/^https:/, "wss:");

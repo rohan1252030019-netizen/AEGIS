@@ -93,10 +93,34 @@ async function request<T>(
     }
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-  });
+  let retries = 3;
+  let delay = 1500;
+  let response: Response;
+
+  while (true) {
+    try {
+      response = await fetch(`${BASE_URL}${endpoint}`, {
+        ...fetchOptions,
+        headers,
+      });
+      // If backend is waking up (cold start 502/503/504), retry automatically
+      if ((response.status === 502 || response.status === 503 || response.status === 504) && retries > 0) {
+        retries--;
+        await new Promise((r) => setTimeout(r, delay));
+        delay *= 1.5;
+        continue;
+      }
+      break;
+    } catch (err) {
+      if (retries > 0) {
+        retries--;
+        await new Promise((r) => setTimeout(r, delay));
+        delay *= 1.5;
+        continue;
+      }
+      throw err;
+    }
+  }
 
   if (!response.ok) {
     // Global 401 interceptor: clear tokens and redirect to login

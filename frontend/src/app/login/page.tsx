@@ -47,10 +47,10 @@ function LoginCard() {
   const searchParams = useSearchParams();
   const nextParam = searchParams.get('next') || '/dashboard';
 
-  const [mode, setMode] = useState<AuthMode>('apikey');
-  const [key, setKey] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<AuthMode>('credentials');
+  const [key, setKey] = useState('c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ');
+  const [email, setEmail] = useState('admin@aegis.local');
+  const [password, setPassword] = useState('admin123456');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -122,11 +122,34 @@ function LoginCard() {
       router.replace(nextParam);
     } catch (err: unknown) {
       if (err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('NetworkError'))) {
-        setError('Cannot connect to backend at http://localhost:8000. Ensure uvicorn is running.');
+        setError('Connecting to cloud backend. Server may be initializing, please click Instant Sign-In again.');
       } else {
         setError(err instanceof Error && err.message !== 'Failed to fetch' ? err.message : 'Invalid email or password');
       }
       setBusy(false);
+    }
+  }
+
+  async function instantDemoLogin() {
+    setBusy(true);
+    setError(null);
+    try {
+      localStorage.removeItem('aegis_api_key');
+      localStorage.removeItem('aegis_jwt_token');
+      const result = await api.auth.loginCredentials('admin@aegis.local', 'admin123456');
+      if (result?.token) setJwtToken(result.token);
+      router.replace(nextParam);
+    } catch {
+      try {
+        const rootKey = 'c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ';
+        setApiKey(rootKey);
+        const result = await api.auth.login(rootKey);
+        if (result?.token) setJwtToken(result.token);
+        router.replace(nextParam);
+      } catch (err: unknown) {
+        setError('Connecting to cloud backend. Server may be initializing, please click Instant Sign-In again.');
+        setBusy(false);
+      }
     }
   }
 
@@ -308,6 +331,16 @@ function LoginCard() {
             </div>
           )}
 
+          {/* Instant Demo Access Button */}
+          <button
+            type="button"
+            onClick={instantDemoLogin}
+            disabled={busy}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-semibold text-[13px] transition-all duration-150"
+          >
+            <span>⚡ Instant Demo Sign-In (Click to Enter)</span>
+          </button>
+
           <button
             type="submit"
             disabled={busy}
@@ -332,6 +365,11 @@ function LoginCard() {
               </>
             )}
           </button>
+
+          <div className="pt-2 rounded-lg bg-background/50 border border-border/50 p-2 text-center text-[11px] text-muted-foreground/80 space-y-0.5">
+            <p><span className="text-foreground font-medium">Demo Email:</span> admin@aegis.local</p>
+            <p><span className="text-foreground font-medium">Password:</span> admin123456</p>
+          </div>
 
           <div className="pt-1 flex items-center justify-between text-[11px] text-muted-foreground/65">
             <Link
