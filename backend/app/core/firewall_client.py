@@ -15,13 +15,33 @@ TIMEOUT = 30.0
 def _auth_headers() -> dict:
     """Shared-secret header attached to every request sent to the Pi agent.
 
-    Set AEGIS_FIREWALL_SECRET (same value on Mac Pro and the Pi) to
-    authenticate the Mac Pro <-> Pi firewall channel. If unset here, an
-    empty string is sent — the agent runs in optional-accept mode until
-    AEGIS_FIREWALL_SECRET is configured on both sides (see
-    firewall-agent/main.py for the enforcement/compat behavior).
+    Read from pydantic settings first (so .env works), then os.environ. When
+    unset, the agent must refuse non-loopback requests (fail closed).
     """
-    return {"X-AEGIS-FW-Auth": os.getenv("AEGIS_FIREWALL_SECRET", "")}
+    secret = (getattr(settings, "AEGIS_FIREWALL_SECRET", "") or "").strip()
+    if not secret:
+        secret = os.getenv("AEGIS_FIREWALL_SECRET", "").strip()
+    return {"X-AEGIS-FW-Auth": secret}
+
+
+def _remote_plaintext(url: str) -> bool:
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme == "http" and host not in ("localhost", "127.0.0.1", "::1")
+
+
+# Fail closed: firewall commands lock/unlock a host. Sending them in cleartext
+# across a network lets anyone on the path inject blocks (or unblocks). Local
+# development over http://localhost remains allowed.
+if FIREWALL_API and _remote_plaintext(FIREWALL_API):
+    logger.error(
+        "AEGIS_FIREWALL_URL uses plaintext HTTP to a remote host (%s); "
+        "firewall integration disabled. Use https://.",
+        FIREWALL_API,
+    )
+    FIREWALL_API = ""
 
 
 class FirewallClient:

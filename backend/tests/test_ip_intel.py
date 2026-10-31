@@ -379,7 +379,7 @@ async def test_api_endpoint_internal_ip_returns_200(client, test_client_a):
 
 
 @pytest.mark.asyncio
-async def test_api_endpoint_requires_auth(client):
+async def test_api_endpoint_requires_auth(unauth_client):
     """GET /api/v1/intel/ip/<ip> without auth returns 401 or 403."""
-    resp = await client.get("/api/v1/intel/ip/1.1.1.1")
+    resp = await unauth_client.get("/api/v1/intel/ip/1.1.1.1")
     assert resp.status_code in (401, 403)

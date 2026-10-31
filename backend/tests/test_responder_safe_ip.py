@@ -35,7 +35,7 @@ def _safe_ips_env():
 
 
 @pytest.mark.asyncio
-async def test_guardrail_short_circuits_safe_ip_block(db_session, test_client_a):
+async def test_guardrail_short_circuits_safe_ip_block(db_session, test_client_a, sample_incident_a):
     """Guardrail must create a skipped_safe_ip Action for IPs in AEGIS_SAFE_IPS."""
     from app.core.guardrails import GuardrailEngine
 
@@ -46,7 +46,7 @@ async def test_guardrail_short_circuits_safe_ip_block(db_session, test_client_a)
         target="66.249.69.68",  # Googlebot, in 66.249.0.0/16
         ai_reasoning="scanner_detect on /wp-login",
         db=db_session,
-        incident_id=None,
+        incident_id=sample_incident_a.id,
     )
     assert action.status == "skipped_safe_ip"
     assert action.requires_approval is False
@@ -54,7 +54,7 @@ async def test_guardrail_short_circuits_safe_ip_block(db_session, test_client_a)
 
 
 @pytest.mark.asyncio
-async def test_guardrail_allows_non_safe_ip(db_session, test_client_a):
+async def test_guardrail_allows_non_safe_ip(db_session, test_client_a, sample_incident_a):
     """Guardrail must auto-approve non-safe IPs as before."""
     from app.core.guardrails import GuardrailEngine
 
@@ -65,19 +65,19 @@ async def test_guardrail_allows_non_safe_ip(db_session, test_client_a):
         target="185.220.101.250",  # Tor exit, NOT in safe list
         ai_reasoning="brute_force",
         db=db_session,
-        incident_id=None,
+        incident_id=sample_incident_a.id,
     )
     assert action.status == "approved"
 
 
 @pytest.mark.asyncio
-async def test_responder_refuses_safe_ip_execution(db_session, test_client_a):
+async def test_responder_refuses_safe_ip_execution(db_session, test_client_a, sample_incident_a):
     """Even if an Action somehow becomes approved for a safe IP, the responder must refuse."""
     from app.modules.response.responder import ActiveResponder
 
     # Manually craft an "approved" action targeting a safe IP (bypass guardrails).
     action = Action(
-        incident_id="",
+        incident_id=sample_incident_a.id,
         client_id=test_client_a.id,
         action_type="block_ip",
         target="66.249.69.99",  # also in 66.249.0.0/16

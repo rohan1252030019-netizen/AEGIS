@@ -251,7 +251,7 @@ async def test_guardrail_require_approval_creates_pending_action(
     action = await guardrail_engine.evaluate_action(
         client=test_client_a,
         action_type="isolate_host",
-        target="192.168.1.50",
+        target="203.0.113.50",
         ai_reasoning="Lateral movement detected",
         db=db_session,
         incident_id=sample_incident_a.id,

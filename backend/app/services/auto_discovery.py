@@ -381,6 +381,23 @@ class AutoDiscovery:
                 error="nmap not found. Install with: brew install nmap (macOS) or apt install nmap (Linux)",
             )
 
+        # Never pass an unvalidated string to nmap. Only a literal IP or CIDR
+        # is accepted, and `--` below stops option parsing — otherwise a target
+        # like "-oN/tmp/x" could write files or load scripts.
+        import ipaddress
+
+        try:
+            if "/" in target:
+                ipaddress.ip_network(target, strict=False)
+            else:
+                ipaddress.ip_address(target)
+        except ValueError:
+            return ScanResult(
+                target=target,
+                scan_time_ms=0,
+                error="Invalid scan target: expected an IP address or CIDR range",
+            )
+
         # Full scan: standard + all common web/app/db/cache/monitoring/proxy ports
         # Excludes 2222 and 8888 (AEGIS honeypot ports) to avoid false positives
         extra_ports = ",".join([
@@ -447,6 +464,7 @@ class AutoDiscovery:
             "-T4",        # aggressive timing
             "-p", f"1-1024,{extra_ports}",
             "-oG", "-",   # greppable output to stdout
+            "--",         # end of options — target can never be parsed as a flag
             target,
         ]
 

@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import subprocess
 import time
 from contextlib import asynccontextmanager
@@ -28,6 +29,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -406,11 +408,47 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        o.strip()
+        for o in os.getenv(
+            "AEGIS_FW_CORS_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if o.strip()
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["X-AEGIS-FW-Auth", "X-AEGIS-Netshield", "Content-Type"],
 )
+
+_FW_SHARED_SECRET = os.getenv("AEGIS_FIREWALL_SECRET", "").strip()
+
+
+@app.middleware("http")
+async def _enforce_shared_secret(request: Request, call_next):
+    """Require the shared secret for every non-health request.
+
+    Fails closed when AEGIS_FIREWALL_SECRET is unset: only loopback callers
+    (systemd health checks / local tooling) are accepted. This service runs
+    iptables as root, so an unauthenticated network API is not acceptable.
+    """
+    if request.url.path == "/health":
+        return await call_next(request)
+    if not _FW_SHARED_SECRET:
+        peer = request.client.host if request.client else ""
+        if peer in ("127.0.0.1", "::1", "localhost"):
+            return await call_next(request)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "AEGIS_FIREWALL_SECRET is not configured on this agent"},
+        )
+    supplied = request.headers.get("X-AEGIS-FW-Auth", "")
+    if not secrets.compare_digest(supplied, _FW_SHARED_SECRET):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "invalid or missing X-AEGIS-FW-Auth header"},
+        )
+    return await call_next(request)
 
 
 # ---------------------------------------------------------------------------

@@ -16,7 +16,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+
+from app.core.rate_limit import client_ip_key
 
 from app.config import settings
 from app.database import get_db
@@ -29,7 +30,7 @@ from app.services import asset_risk
 
 logger = logging.getLogger("aegis.setup")
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip_key)
 
 router = APIRouter(prefix="/setup", tags=["setup"])
 
@@ -214,6 +215,19 @@ async def discover_services(
     The scan runs in the background.  Poll GET /setup/discover/{scan_id}
     for results.
     """
+    import ipaddress
+
+    try:
+        if "/" in body.target:
+            ipaddress.ip_network(body.target, strict=False)
+        else:
+            ipaddress.ip_address(body.target)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="target must be a valid IPv4/IPv6 address or CIDR range",
+        )
+
     scan_id = f"disc_{uuid.uuid4().hex[:12]}"
     _prune_background_scans()
 

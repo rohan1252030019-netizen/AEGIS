@@ -4,17 +4,26 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app.config import settings
 from app.database import engine, async_session
 from app.models import Base
-from app.core.auth import seed_demo_client, seed_default_admin
-from app.core.boot_guard import assert_production_secrets, DEFAULT_ADMIN_PASSWORD
+from app.core.auth import (
+    AuthContext,
+    decode_jwt_token,
+    require_viewer,
+    seed_default_admin,
+    seed_demo_client,
+)
+from app.core.boot_guard import assert_production_secrets
+from app.core.demo import configure_demo_identity
+from app.core.demo_sandbox import DemoSandboxMiddleware
+from app.core.rate_limit import client_ip_key
 from app.core.events import event_bus
 from app.core.event_stream import EventStream
 from app.core.ws_push import ws_push_manager
@@ -309,6 +318,7 @@ async def lifespan(app: FastAPI):
         env=settings.AEGIS_ENV,
         secret_key=settings.AEGIS_SECRET_KEY,
         admin_password=settings.AEGIS_ADMIN_PASSWORD,
+        demo_mode=settings.AEGIS_DEMO_MODE,
     )
 
     # P0-7: DeceptionCampaign isn't imported by app/models/__init__.py (out of
@@ -337,9 +347,23 @@ async def lifespan(app: FastAPI):
     async with async_session() as db:
         from sqlalchemy import select as _startup_sel
         demo = await seed_demo_client(db)
-        logger.info(f"Demo client ready: slug='{demo.slug}' api_key='{demo.api_key}'")
-        await seed_default_admin(db, demo)
-        logger.info("Default admin user seeded (admin@cayde6.local)")
+        # Never log the API key itself — logs are shipped/aggregated and the
+        # hosted demo key would otherwise be exposed a second time.
+        logger.info("Demo client ready: slug='%s' id='%s'", demo.slug, demo.id)
+        admin_user = await seed_default_admin(db, demo)
+        from app.core.demo import is_public_demo_key
+
+        configure_demo_identity(
+            demo.id,
+            getattr(admin_user, "id", None),
+            published_key=is_public_demo_key(demo.api_key),
+        )
+        logger.info("Default admin user seeded (admin@aegis.local)")
+        if settings.AEGIS_DEMO_MODE:
+            logger.warning(
+                "AEGIS_DEMO_MODE is ON: the demo tenant is confined to the "
+                "read-only sandbox (destructive endpoints return 403)."
+            )
 
         # Get ALL clients for auto-discovery — each client gets their own assets
         _all_clients = await db.execute(_startup_sel(Client))
@@ -839,7 +863,7 @@ async def lifespan(app: FastAPI):
 # --- App ---
 
 # --- Rate limiter (shared instance used by route decorators) ---
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip_key)
 
 app = FastAPI(
     title="Cayde-6 Defense Platform",
@@ -856,9 +880,14 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.exception_handler(404)
 async def custom_404_handler(request: Request, exc):
     from starlette.responses import JSONResponse
+    # Preserve the HTTPException detail (route handlers use it to name the
+    # missing resource, e.g. an unknown campaign cluster id) while keeping
+    # the discovery hints for genuinely unmatched routes.
+    detail = getattr(exc, "detail", None) or f"Route '{request.url.path}' was not found."
     return JSONResponse(
         status_code=404,
         content={
+            "detail": detail,
             "error": "Not Found",
             "requested_path": request.url.path,
             "message": f"Route '{request.url.path}' was not found.",
@@ -871,7 +900,13 @@ async def custom_404_handler(request: Request, exc):
 
 # CORS
 _cors_origins = set([o.strip() for o in settings.AEGIS_CORS_ORIGINS.split(",") if o.strip()])
-_cors_origins.update(["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3007", "http://127.0.0.1:3007"])
+if settings.AEGIS_ENV != "production":
+    # Local dev conveniences only. In production the operator's explicit
+    # AEGIS_CORS_ORIGINS list is authoritative — never widen it silently.
+    _cors_origins.update([
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:3007", "http://127.0.0.1:3007",
+    ])
 
 app.add_middleware(
     CORSMiddleware,
@@ -880,6 +915,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# IP denylist (previously defined but never registered -> /blocked_ips.txt was
+# inert). Placed just inside CORS so 403s still carry CORS headers.
+from app.core.ip_blocker import IPBlockerMiddleware
+app.add_middleware(IPBlockerMiddleware)
+
+# Public-demo sandbox: read-only for the published demo credentials.
+app.add_middleware(DemoSandboxMiddleware)
+
+# Security headers on every response.
+from app.core.security_headers import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Attack detection middleware (runs before every request)
 from app.core.attack_detector import AttackDetectorMiddleware
@@ -913,7 +960,6 @@ app.include_router(feeds.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(ai_providers_router.router, prefix="/api/v1")
 app.include_router(ask_ai_router.router, prefix="/api/v1")
-app.include_router(ask_ai_router.router)
 app.include_router(agents_router.router, prefix="/api/v1")
 app.include_router(intel_cloud_router.router, prefix="/api/v1")
 app.include_router(behavioral_router.router, prefix="/api/v1")
@@ -938,14 +984,84 @@ app.include_router(intel_router.router, prefix="/api/v1/intel", tags=["ip-intel"
 app.include_router(admin.router, prefix="/api/v1")
 
 
-# --- WebSocket endpoint (enhanced with WSPushManager) ---
+# --- WebSocket endpoint (authenticated) ---
+
+async def _authenticate_ws_token(token: str) -> str | None:
+    """Resolve a WS bearer token (API key or JWT) to a client id."""
+    token = (token or "").strip()
+    if not token:
+        return None
+
+    from app.models.user import User
+
+    async with async_session() as db:
+        if token.startswith("c6_"):
+            row = await db.execute(select(Client).where(Client.api_key == token))
+            client = row.scalar_one_or_none()
+            if client:
+                return client.id
+
+        try:
+            payload = decode_jwt_token(token)
+        except HTTPException:
+            return None
+
+        if payload.get("type", "client") == "user":
+            user = await db.get(User, payload.get("sub"))
+            if user and user.is_active and user.client_id:
+                return user.client_id
+            return None
+
+        client_id = payload.get("sub")
+        if client_id and await db.get(Client, client_id):
+            return client_id
+    return None
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # Accept query param for client identification
-    client_id = websocket.query_params.get("client_id", "anonymous")
-    ws_client = await ws_push_manager.connect(websocket, client_id)
+    """Live dashboard socket.
+
+    The first frame must be ``{"type": "auth", "token": "<jwt or api key>"}``
+    within AEGIS_WS_AUTH_TIMEOUT. This replaces the old unauthenticated
+    ``?client_id=`` scheme, which let anybody receive every broadcast.
+    """
+    await websocket.accept()
     try:
+        raw = await asyncio.wait_for(
+            websocket.receive_text(),
+            timeout=float(settings.AEGIS_WS_AUTH_TIMEOUT),
+        )
+    except (asyncio.TimeoutError, WebSocketDisconnect):
+        try:
+            await websocket.close(code=4401)
+        except Exception:
+            pass
+        return
+
+    try:
+        auth_msg = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        auth_msg = {}
+
+    if not isinstance(auth_msg, dict) or auth_msg.get("type") not in ("auth", "authenticate"):
+        await websocket.send_json({"type": "auth_error", "detail": "Authentication required"})
+        await websocket.close(code=4401)
+        return
+
+    token = auth_msg.get("token") or auth_msg.get("api_key") or auth_msg.get("access_token")
+    client_id = await _authenticate_ws_token(token)
+    if not client_id:
+        await websocket.send_json({"type": "auth_error", "detail": "Invalid or expired credentials"})
+        await websocket.close(code=4401)
+        return
+
+    ws_client = await ws_push_manager.register(websocket, client_id)
+    if ws_client is None:
+        return
+
+    try:
+        await websocket.send_json({"type": "auth_ok"})
         while True:
             data = await websocket.receive_text()
             try:
@@ -973,6 +1089,10 @@ async def websocket_endpoint(websocket: WebSocket):
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.debug("WS connection error for %s: %s", client_id, exc)
+    finally:
         ws_push_manager.disconnect(ws_client)
 
 
@@ -1016,7 +1136,7 @@ async def api_health():
 # --- Pipeline stats endpoint ---
 
 @app.get("/api/v1/pipeline/stats")
-async def pipeline_stats():
+async def pipeline_stats(auth: AuthContext = Depends(require_viewer)):
     from app.services.ai_engine import ai_engine
     return {
         "event_bus": event_bus.stats(),

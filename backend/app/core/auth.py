@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Union
 
-from fastapi import Depends, HTTPException, Security
+from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.demo import configure_demo_identity, is_demo_auth, is_demo_client
 from app.database import get_db
 from app.models.client import Client
 
@@ -115,8 +116,14 @@ class AuthContext:
     def is_api_key(self) -> bool:
         return self.user is None
 
+    @property
+    def is_demo(self) -> bool:
+        """True when this request belongs to the public demo tenant."""
+        return is_demo_auth(self)
+
 
 async def get_auth_context(
+    request: Request,
     api_key: Optional[str] = Security(api_key_header),
     bearer: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
     db: AsyncSession = Depends(get_db),
@@ -158,6 +165,30 @@ async def get_auth_context(
 
             if not client:
                 raise HTTPException(status_code=403, detail="User is not associated with a valid tenant")
+
+            # A seeded admin may be flagged to rotate a weak/default password.
+            # Enforce it (except for the public demo, which must stay usable)
+            # but leave read-of-self + change-password reachable so the caller
+            # can actually complete the rotation.
+            if (
+                getattr(user, "must_change_password", False)
+                and settings.AEGIS_ENV == "production"
+                and not settings.AEGIS_DEMO_MODE
+            ):
+                path = request.url.path
+                allowed = (
+                    "/api/v1/auth/change-password",
+                    "/api/v1/auth/me",
+                    "/api/v1/auth/user/login",
+                )
+                if not any(path == p or path.startswith(p + "/") for p in allowed):
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            "Password change required before using the API. "
+                            "Call POST /api/v1/auth/change-password."
+                        ),
+                    )
 
             return AuthContext(
                 client=client,
@@ -225,16 +256,31 @@ async def require_viewer(
 # --- Seed functions ---
 
 async def seed_demo_client(db: AsyncSession) -> Client:
-    """Create a demo client if none exist."""
+    """Create a demo client if none exist.
+
+    On a deliberate public demo (AEGIS_DEMO_MODE=true) the tenant always owns
+    the published demo key, so the advertised credentials keep working on a
+    fresh database. A normal self-host gets a random key.
+    """
+    published_key = (
+        (settings.AEGIS_PUBLIC_DEMO_API_KEY or "").strip()
+        if settings.AEGIS_DEMO_MODE
+        else ""
+    )
+
     result = await db.execute(select(Client).where(Client.slug == "demo"))
     existing = result.scalar_one_or_none()
     if existing:
+        if published_key and existing.api_key != published_key:
+            existing.api_key = published_key
+            await db.commit()
+            await db.refresh(existing)
         return existing
 
     demo_client = Client(
         name="AEGIS Demo",
         slug="demo",
-        api_key=generate_api_key(),
+        api_key=published_key or generate_api_key(),
         settings={
             "scan_interval": 3600,
             "auto_response": True,
@@ -264,15 +310,19 @@ async def seed_demo_client(db: AsyncSession) -> Client:
     return demo_client
 
 
-async def seed_default_admin(db: AsyncSession, client: Client) -> None:
-    """Create default admin user if no users exist."""
+async def seed_default_admin(db: AsyncSession, client: Client):
+    """Create default admin user if no users exist. Returns the admin user."""
     from app.models.user import User, UserRole
 
     result = await db.execute(select(User).limit(1))
     existing = result.scalar_one_or_none()
     if existing:
-        return
+        return existing
 
+    weak_password = (
+        settings.AEGIS_ADMIN_PASSWORD == "changeme-on-first-login"
+        or settings.AEGIS_ADMIN_PASSWORD == "admin123456"
+    )
     admin_user = User(
         email="admin@aegis.local",
         password_hash=hash_password(settings.AEGIS_ADMIN_PASSWORD),
@@ -280,7 +330,12 @@ async def seed_default_admin(db: AsyncSession, client: Client) -> None:
         role=UserRole.admin,
         client_id=client.id,
         is_active=True,
-        must_change_password=True,
+        # Only ask for a rotation when the deployment actually booted with a
+        # published/default password. The public demo is exempt so the
+        # advertised login keeps working.
+        must_change_password=bool(weak_password and not settings.AEGIS_DEMO_MODE),
     )
     db.add(admin_user)
     await db.commit()
+    await db.refresh(admin_user)
+    return admin_user

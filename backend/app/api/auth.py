@@ -6,7 +6,8 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+
+from app.core.rate_limit import client_ip_key
 
 from app.database import get_db
 from app.core.auth import (
@@ -25,7 +26,7 @@ from app.core.audit import log_audit
 from app.models.client import Client
 from app.models.user import User, UserRole
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip_key)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -101,6 +102,38 @@ class MeResponse(BaseModel):
     auth_type: str  # "user" or "api_key"
     user: Optional[UserOut] = None
     client: ClientInfo
+    is_demo: bool = False
+
+
+# Keys whose values must never leave the API in the generic /auth/me payload.
+# Dedicated endpoints (e.g. /settings/notifications) still expose them to the
+# owning admin; /auth/me is consumed by every dashboard page and must not leak
+# provider keys or webhook secrets into the browser.
+_SENSITIVE_SETTING_FRAGMENTS = (
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "private_key",
+    "credential",
+    "webhook_url",
+    "authorization",
+)
+
+
+def _redact_settings(value):
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            if any(frag in str(key).lower() for frag in _SENSITIVE_SETTING_FRAGMENTS):
+                redacted[key] = "***redacted***"
+            else:
+                redacted[key] = _redact_settings(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_settings(item) for item in value]
+    return value
 
 
 # --- Legacy client auth routes ---
@@ -235,7 +268,7 @@ async def get_me(auth: AuthContext = Depends(get_auth_context)):
         id=auth.client.id,
         name=auth.client.name,
         slug=auth.client.slug,
-        settings=auth.client.settings or {},
+        settings=_redact_settings(auth.client.settings or {}),
         guardrails=auth.client.guardrails or {},
     )
 
@@ -257,6 +290,7 @@ async def get_me(auth: AuthContext = Depends(get_auth_context)):
         auth_type="user" if auth.user else "api_key",
         user=user_out,
         client=client_info,
+        is_demo=auth.is_demo,
     )
 
 

@@ -3324,21 +3324,39 @@ def _matches_filter(event: dict, filt: dict) -> bool:
         if isinstance(expected, list):
             # path_contains: any element must be a substring of actual
             if key == "path_contains":
-                path = event.get("path", "") or event.get("request_path", "") or event.get("url", "") or ""
+                path = (
+                    event.get("path")
+                    or event.get("request_path")
+                    or event.get("url")
+                    or event.get("file_path")
+                    or ""
+                )
                 _p = path.lower()
                 if not any(str(fragment).lower() in _p for fragment in expected):
                     return False
                 continue
             # path_contains_all: every element must be a substring
             if key == "path_contains_all":
-                path = event.get("path", "") or event.get("request_path", "") or event.get("url", "") or ""
+                path = (
+                    event.get("path")
+                    or event.get("request_path")
+                    or event.get("url")
+                    or event.get("file_path")
+                    or ""
+                )
                 _p = path.lower()
                 if not all(str(fragment).lower() in _p for fragment in expected):
                     return False
                 continue
             # v1.6.3.5: path_excludes — fail the rule if path contains ANY listed fragment
             if key == "path_excludes":
-                path = event.get("path", "") or event.get("request_path", "") or event.get("url", "") or ""
+                path = (
+                    event.get("path")
+                    or event.get("request_path")
+                    or event.get("url")
+                    or event.get("file_path")
+                    or ""
+                )
                 _p = path.lower()
                 if any(str(fragment).lower() in _p for fragment in expected):
                     return False

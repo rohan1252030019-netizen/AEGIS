@@ -47,11 +47,36 @@ def _resolve_extra_log_paths(raw: str = "") -> list[str]:
     if not raw:
         raw = os.environ.get("AEGIS_EXTRA_LOG_PATHS", "")
     result: list[str] = []
-    for pattern in (p.strip() for p in raw.split(":") if p.strip()):
+    for pattern in _split_extra_paths(raw):
         for fpath in sorted(_glob.glob(os.path.expanduser(pattern))):
             if os.path.isfile(fpath):
                 result.append(fpath)
     return result
+
+
+def _split_extra_paths(raw: str) -> list[str]:
+    """Split a colon-separated path list without eating Windows drive letters.
+
+    ``C:\\logs\\*.log:D:\\other\\*.log`` must stay two absolute paths, not
+    become ``C``, ``\\logs\\*.log``, ``D``, ... (which happens with a naive
+    ``raw.split(":")`` on Windows).
+    """
+    chunks = [p.strip() for p in raw.split(":")]
+    paths: list[str] = []
+    for chunk in chunks:
+        if not chunk:
+            continue
+        if (
+            paths
+            and len(paths[-1]) == 1
+            and paths[-1].isalpha()
+            and chunk[:1] in ("\\", "/")
+        ):
+            # Reattach the drive letter split off by the colon separator.
+            paths[-1] = f"{paths[-1]}:{chunk}"
+        else:
+            paths.append(chunk)
+    return paths
 
 
 logger = logging.getLogger("aegis.log_watcher")

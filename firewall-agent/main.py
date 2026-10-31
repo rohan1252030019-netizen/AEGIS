@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import socket
 import subprocess
 import time
@@ -837,10 +838,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        o.strip()
+        for o in os.getenv(
+            "AEGIS_FW_CORS_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if o.strip()
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["X-AEGIS-FW-Auth", "X-AEGIS-Netshield", "Content-Type"],
 )
 
 
@@ -867,10 +875,26 @@ async def _enforce_shared_secret(request: Request, call_next):
     if request.url.path == "/health":
         return await call_next(request)
     if not AEGIS_FIREWALL_SECRET:
-        # Compat mode: no secret configured yet on this agent — accept.
-        return await call_next(request)
+        # Fail closed: an agent reachable over the network with no shared
+        # secret is an unauthenticated root-level firewall API.
+        peer = request.client.host if request.client else ""
+        if peer in ("127.0.0.1", "::1", "localhost"):
+            return await call_next(request)
+        logger.critical(
+            "AEGIS_FIREWALL_SECRET is not set; refusing non-loopback request from %s",
+            peer,
+        )
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": (
+                    "Agent is not configured: set AEGIS_FIREWALL_SECRET and send "
+                    "it in the X-AEGIS-FW-Auth header."
+                )
+            },
+        )
     supplied = request.headers.get("X-AEGIS-FW-Auth", "")
-    if supplied != AEGIS_FIREWALL_SECRET:
+    if not secrets.compare_digest(supplied, AEGIS_FIREWALL_SECRET):
         return JSONResponse(
             status_code=401,
             content={"detail": "invalid or missing X-AEGIS-FW-Auth header"},

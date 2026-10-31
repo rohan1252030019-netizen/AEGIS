@@ -35,6 +35,8 @@ class LiveWS {
   private reconnectTimer: number | null = null;
   private pingTimer: number | null = null;
   private closedByUser = false;
+  private authFailed = false;
+  private lastToken = "";
   private subscribedTopics = new Set<string>();
 
   constructor(url: string) {
@@ -67,6 +69,26 @@ class LiveWS {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
+
+    const token =
+      localStorage.getItem("aegis_jwt_token") ||
+      localStorage.getItem("aegis_api_key") ||
+      "";
+    if (!token) {
+      // No credentials yet (login page). Do not open or retry a socket that
+      // the server will reject.
+      this.setStatus("idle");
+      return;
+    }
+
+    // A new login/logout cycle replaces the token: clear the permanent
+    // auth-failure latch so the freshly stored credentials are tried.
+    if (token !== this.lastToken) {
+      this.lastToken = token;
+      this.authFailed = false;
+    }
+    if (this.authFailed) return;
+
     this.closedByUser = false;
     this.setStatus("connecting");
 
@@ -82,11 +104,13 @@ class LiveWS {
     this.ws.onopen = () => {
       this.reconnectAttempt = 0;
       this.setStatus("open");
-      // Re-subscribe to all topics via event_types filter
+      // Authenticate as the very first frame. Messages are ordered, so the
+      // subscribe frames that follow are processed after auth succeeds.
+      this.sendRaw({ type: "auth", token });
       if (this.subscribedTopics.size > 0) {
         this.sendRaw({
           type: "subscribe",
-          event_types: Array.from(this.subscribedTopics),
+          topics: Array.from(this.subscribedTopics),
         });
       }
       this.startPing();
@@ -99,7 +123,18 @@ class LiveWS {
       } catch {
         return;
       }
-      if (msg.type === "pong" || msg.type === "filters_updated" || msg.type === "subscribed") {
+      if (msg.type === "auth_error") {
+        this.authFailed = true;
+        this.setStatus("error");
+        return;
+      }
+      if (
+        msg.type === "pong" ||
+        msg.type === "auth_ok" ||
+        msg.type === "filters_updated" ||
+        msg.type === "subscribed" ||
+        msg.type === "unsubscribed"
+      ) {
         return;
       }
       // Dispatch by topic (msg.topic preferred; fallback to msg.type)
@@ -113,11 +148,16 @@ class LiveWS {
       this.setStatus("error");
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (ev) => {
       this.stopPing();
-      this.setStatus("closed");
+      this.setStatus(this.authFailed || ev.code === 4401 ? "error" : "closed");
       this.ws = null;
-      if (!this.closedByUser) {
+      // 4401 = authentication failure; reconnecting with the same token only
+      // produces a hot loop.
+      if (ev.code === 4401) {
+        this.authFailed = true;
+      }
+      if (!this.closedByUser && !this.authFailed) {
         this.scheduleReconnect();
       }
     };
@@ -222,31 +262,65 @@ class LiveWS {
 
 let _singleton: LiveWS | null = null;
 
+/**
+ * Resolve the WebSocket root.
+ *
+ * Precedence:
+ *   1. NEXT_PUBLIC_WS_URL        — explicit, e.g. wss://api.example.com
+ *   2. NEXT_PUBLIC_API_URL       — derive from the API origin
+ *   3. localhost / 127.0.0.1     — ws://localhost:8000 for local dev
+ *   4. same origin               — wss://<dashboard-host>/ws
+ *
+ * There is deliberately no hard-coded backend: every deployment talks to its
+ * own backend instead of a third-party origin.
+ */
+function toWsRoot(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (value.startsWith("/")) {
+    if (typeof window === "undefined") return "";
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}${value}`;
+  }
+  return value.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
+}
+
 function buildWsUrl(): string {
-  let wsRoot = "wss://aegis-backend-q6ok.onrender.com";
-  if (typeof window !== "undefined") {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      wsRoot = "ws://localhost:8000";
+  let root = "";
+
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    root = toWsRoot(process.env.NEXT_PUBLIC_WS_URL);
+  }
+
+  if (!root && process.env.NEXT_PUBLIC_API_URL) {
+    const api = process.env.NEXT_PUBLIC_API_URL.trim();
+    // Strip the API prefix so https://host/api/v1 becomes wss://host/ws.
+    root = toWsRoot(api.replace(/\/api\/v1\/?$/i, ""));
+  }
+
+  if (!root && typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+      root = "ws://localhost:8000";
     } else {
-      wsRoot = "wss://aegis-backend-q6ok.onrender.com";
+      const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      root = `${proto}//${window.location.host}`;
     }
-  } else if (process.env.NEXT_PUBLIC_API_URL) {
-    const root = process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, "");
-    wsRoot = root.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
   }
-  let clientId = "anonymous";
-  if (typeof window !== "undefined") {
-    clientId = localStorage.getItem("aegis_client_id") || "dashboard-live";
-  }
-  return `${wsRoot}/ws?client_id=${encodeURIComponent(clientId)}`;
+
+  if (!root) return "";
+  const base = root.replace(/\/+$/, "").replace(/\/ws$/i, "");
+  return `${base}/ws`;
 }
 
 export function getLiveWS(): LiveWS {
   if (!_singleton) {
     _singleton = new LiveWS(buildWsUrl());
-    if (typeof window !== "undefined") {
-      _singleton.connect();
-    }
+  }
+  if (typeof window !== "undefined") {
+    // Idempotent: opens the socket on first use and re-opens it when a token
+    // was stored after the singleton was created on the login page.
+    _singleton.connect();
   }
   return _singleton;
 }

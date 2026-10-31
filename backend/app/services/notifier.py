@@ -18,6 +18,14 @@ class NotificationService:
             return False
 
         try:
+            from app.core.ssrf import validate_outbound_url
+
+            validate_outbound_url(url)
+        except ValueError as exc:
+            logger.warning("Refusing unsafe webhook URL: %s", exc)
+            return False
+
+        try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(url, json=payload)
                 if response.status_code < 300:

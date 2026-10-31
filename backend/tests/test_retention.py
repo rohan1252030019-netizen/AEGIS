@@ -52,7 +52,7 @@ async def test_recent_resolved_incidents_kept(db_session, demo_client, monkeypat
     await ret.nightly_retention_purge()
 
     from sqlalchemy import select
-    result = await db_session.execute(select(Incident).where(Incident.title == "recent resolved"))
+    result = await db_session.execute(select(Incident).where(Incident.id == recent.id))
     assert result.scalar_one_or_none() is not None
 
 
@@ -79,7 +79,7 @@ async def test_dry_run_does_not_delete(db_session, demo_client, monkeypatch):
     assert summary["dry_run"] is True
 
     from sqlalchemy import select
-    result = await db_session.execute(select(Incident).where(Incident.title == "dry-run candidate"))
+    result = await db_session.execute(select(Incident).where(Incident.id == old.id))
     assert result.scalar_one_or_none() is not None
 
 

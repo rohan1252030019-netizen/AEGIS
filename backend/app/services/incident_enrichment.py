@@ -52,9 +52,23 @@ def _is_lookupable(ip: str | None) -> bool:
         return False
     try:
         addr = ipaddress.ip_address(ip)
-        return not (addr.is_loopback or addr.is_private or addr.is_link_local)
     except (ValueError, TypeError):
         return False
+    # Python's is_private intentionally excludes the shared address space
+    # (100.64.0.0/10), which is what Tailscale and carrier NAT use. Those
+    # addresses cannot be enriched by a public geo/ASN provider.
+    try:
+        if addr in ipaddress.ip_network("100.64.0.0/10"):
+            return False
+    except TypeError:  # IPv4 network vs IPv6 address
+        pass
+    return not (
+        addr.is_loopback
+        or addr.is_private
+        or addr.is_link_local
+        or addr.is_multicast
+        or addr.is_unspecified
+    )
 
 
 async def _enrich_guarded(incident_id: str, src_ip: str) -> None:

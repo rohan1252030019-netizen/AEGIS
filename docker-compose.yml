@@ -2,8 +2,13 @@
 # AEGIS Autonomous Defense Platform â€” Docker Compose
 # ============================================================
 #
-# Quick start (no .env needed â€” sane defaults are built in):
-#   docker compose up -d
+# Quick start:
+#   AEGIS_SECRET_KEY="$(openssl rand -hex 32)" \
+#   AEGIS_ADMIN_PASSWORD="$(openssl rand -base64 24)" \
+#     docker compose up -d
+#
+# Secrets are REQUIRED. AEGIS refuses to boot in production with the old
+# built-in defaults.
 #
 # Full stack (with Redis for event bus + caching):
 #   docker compose --profile full up -d
@@ -23,7 +28,6 @@
 #   OLLAMA_MODEL         Ollama model                (default: llama3)
 #   AEGIS_AI_MODE        AI Mode                     (default: local)
 #   AEGIS_PLATFORM       Platform hint for backend   (default: linux)
-#   JWT_SECRET_KEY       Secret for JWT signing      (default: auto-generated at first run)
 #   AEGIS_MONGODB_URI    MongoDB Atlas connection    (default: empty â€” threat intel hub disabled)
 #
 # WINDOWS / macOS NOTES:
@@ -122,14 +126,23 @@ services:
       - AEGIS_AI_MODE=${AEGIS_AI_MODE:-local}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
-      # JWT configuration
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-aegis-docker-jwt-secret-change-me}
+      # Runtime environment. Production makes the boot guard fatal and turns
+      # off SQL echo.
+      - AEGIS_ENV=${AEGIS_ENV:-production}
+      # Public demo sandbox (leave false for a real deployment).
+      - AEGIS_DEMO_MODE=${AEGIS_DEMO_MODE:-false}
+      # JWT configuration (signing secret comes from AEGIS_SECRET_KEY)
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-1440}
       # MongoDB Atlas for threat intel sharing (optional)
       - AEGIS_MONGODB_URI=${AEGIS_MONGODB_URI:-}
-      - AEGIS_SECRET_KEY=${AEGIS_SECRET_KEY}
-      - AEGIS_ADMIN_PASSWORD=${AEGIS_ADMIN_PASSWORD}
+      # Required — compose aborts with a clear message instead of booting with
+      # the publicly-known development secret.
+      - AEGIS_SECRET_KEY=${AEGIS_SECRET_KEY:?Set AEGIS_SECRET_KEY to a random 32+ byte value}
+      - AEGIS_ADMIN_PASSWORD=${AEGIS_ADMIN_PASSWORD:?Set AEGIS_ADMIN_PASSWORD (min 12 chars)}
+      # Optional shared secrets
+      - AEGIS_HUB_SHARED_SECRET=${AEGIS_HUB_SHARED_SECRET:-}
+      - AEGIS_FIREWALL_SECRET=${AEGIS_FIREWALL_SECRET:-}
       # Allow the browser dashboard and Electron-hosted dashboard to call the API.
       - AEGIS_CORS_ORIGINS=${AEGIS_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:3007,http://127.0.0.1:3007}
       # Use in-memory event bus when Redis is not available
@@ -143,7 +156,7 @@ services:
       aegis-redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 5

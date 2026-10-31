@@ -9,11 +9,18 @@ import path from 'path';
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://aegis-backend-q6ok.onrender.com';
+// Proxy target for the backend API. In production this MUST be provided
+// explicitly (or the app will talk to its own origin and rely on an external
+// reverse proxy). There is deliberately no hard-coded fallback to a hosted
+// backend: shipping one meant every copy of the dashboard silently sent its
+// API traffic (and keys) to a third-party origin.
+const BACKEND_URL =
+  process.env.BACKEND_URL ||
+  (process.env.NODE_ENV !== 'production' ? 'http://localhost:8000' : '');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ['*.trycloudflare.com', 'cedar-kept-anywhere-immunology.trycloudflare.com'],
+  allowedDevOrigins: ['*.trycloudflare.com'],
   env: {
     NEXT_PUBLIC_AEGIS_VERSION: pkg.version,
   },
@@ -21,6 +28,9 @@ const nextConfig = {
     root: path.resolve('.'),
   },
   async rewrites() {
+    if (!BACKEND_URL) {
+      return [];
+    }
     return [
       {
         source: '/api/v1/:path*',

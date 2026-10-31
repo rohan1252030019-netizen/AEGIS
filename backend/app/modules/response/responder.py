@@ -54,6 +54,39 @@ class ActiveResponder:
             })
             return action.result
 
+        # DEMO GUARD: actions owned by the public demo tenant are simulated.
+        # They never touch iptables/pfctl, the firewall agent, the local
+        # blocklist or any process — the public key cannot damage the host.
+        from app.core.demo import is_demo_tenant
+
+        if is_demo_tenant(action.client_id):
+            action.status = "simulated"
+            action.result = {
+                "success": True,
+                "simulated": True,
+                "demo_mode": True,
+                "action": action.action_type,
+                "target": action.target,
+                "note": "Public demo: no host/network changes were made.",
+            }
+            action.executed_at = datetime.utcnow()
+            await db.commit()
+            logger.info(
+                "RESPONDER: simulated %s on %s for demo tenant",
+                action.action_type,
+                action.target,
+            )
+            await event_bus.publish("action_executed", {
+                "action_id": action.id,
+                "client_id": action.client_id,
+                "incident_id": action.incident_id,
+                "action_type": action.action_type,
+                "target": action.target,
+                "success": True,
+                "simulated": True,
+            })
+            return action.result
+
         executor = self._get_executor(action.action_type)
         result = await executor(action.target, action.parameters)
 
@@ -90,6 +123,17 @@ class ActiveResponder:
         """Rollback a previously executed action."""
         if action.status != "executed":
             return {"success": False, "error": "Action not in executed state"}
+
+        from app.core.demo import is_demo_tenant
+
+        if is_demo_tenant(action.client_id):
+            action.status = "rolled_back"
+            action.result = {
+                **(action.result or {}),
+                "rollback": {"success": True, "simulated": True},
+            }
+            await db.commit()
+            return {"success": True, "simulated": True}
 
         rollback_fn = self._get_rollback(action.action_type)
         result = await rollback_fn(action.target, action.parameters)

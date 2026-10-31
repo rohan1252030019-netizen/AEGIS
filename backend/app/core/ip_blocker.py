@@ -163,8 +163,13 @@ class IPBlockerMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware that blocks requests from known-bad IPs."""
 
     async def dispatch(self, request: Request, call_next):
-        client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        if not client_ip:
+        # Use the same trusted-proxy-aware client IP as the WAF/DoS layers.
+        # The previous raw X-Forwarded-For read was trivially spoofable.
+        try:
+            from app.core.dos_middleware import _client_ip
+
+            client_ip = _client_ip(request)
+        except Exception:
             client_ip = request.client.host if request.client else "unknown"
 
         if ip_blocker_service.is_blocked(client_ip):

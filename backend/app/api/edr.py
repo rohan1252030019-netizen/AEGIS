@@ -13,6 +13,7 @@ Endpoints:
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import logging
 import os
@@ -342,10 +343,15 @@ XOR_KEY = 0xAA  # Simple XOR obfuscation to prevent accidental execution
 
 class KillProcessRequest(BaseModel):
     pid: int
+    confirm: bool = False
 
 
 class QuarantineFileRequest(BaseModel):
     path: str
+    # SHA-256 of the exact file the operator intends to remove. Prevents a
+    # TOCTOU swap between inspection and quarantine.
+    expected_sha256: str
+    confirm: bool = False
 
 
 @router.post("/kill-process")
@@ -353,11 +359,24 @@ async def kill_process(
     body: KillProcessRequest,
     auth: AuthContext = Depends(require_admin),
 ):
-    """Kill a process by PID. Admin only."""
+    """Kill a process by PID. Admin only, explicit confirmation required."""
     pid = body.pid
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Confirmation required to kill a process")
+    if pid <= 1 or pid in (os.getpid(), os.getppid()):
+        raise HTTPException(status_code=400, detail="Refusing to kill a critical system process")
     try:
         proc = psutil.Process(pid)
-        proc_name = proc.name()
+        proc_name = (proc.name() or "").lower()
+        protected = {
+            "systemd", "init", "launchd", "kernel_task", "sshd", "wininit",
+            "winlogon", "csrss", "smss", "services", "lsass", "svchost",
+        }
+        if proc_name in protected:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Refusing to kill protected system process {proc_name}",
+            )
         proc.kill()
         logger.warning("EDR kill-process: pid=%d name=%s by user=%s", pid, proc_name, auth.user_id or auth.client_id)
 
@@ -381,48 +400,147 @@ async def kill_process(
         raise HTTPException(status_code=500, detail=f"Failed to kill process: {e}")
 
 
+def _configured_quarantine_roots() -> list[Path]:
+    from app.config import settings
+
+    roots: list[Path] = []
+    for raw in str(getattr(settings, "AEGIS_QUARANTINE_ROOTS", "") or "").split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            roots.append(Path(raw).expanduser().resolve(strict=True))
+        except (OSError, RuntimeError):
+            logger.warning("ignoring invalid AEGIS_QUARANTINE_ROOTS entry: %s", raw)
+    return roots
+
+
+def _resolve_quarantinable_file(raw_path: str) -> Path:
+    """Resolve and validate a quarantine candidate against operator roots.
+
+    Raises HTTPException for every rejection. The returned path is fully
+    resolved, verified to be a regular file, and inside one allowed root.
+    """
+    from app.config import settings
+
+    roots = _configured_quarantine_roots()
+    if not roots:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "File quarantine is disabled. Set AEGIS_QUARANTINE_ROOTS to a "
+                "comma-separated list of allowed absolute directories."
+            ),
+        )
+
+    candidate = Path(raw_path).expanduser()
+    if not candidate.is_absolute():
+        raise HTTPException(status_code=400, detail="Path must be absolute")
+
+    # Reject symlinks outright: following one could move a file outside the
+    # allow-listed roots (or let an attacker point at /etc/shadow).
+    if candidate.is_symlink():
+        raise HTTPException(status_code=400, detail="Symlinks cannot be quarantined")
+
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise HTTPException(status_code=404, detail=f"File not found: {raw_path}")
+
+    if not resolved.is_file():
+        raise HTTPException(status_code=400, detail="Path is not a regular file")
+
+    aegis_dir = Path(__file__).resolve().parent.parent.parent  # backend/
+    quarantine_dir = QUARANTINE_DIR.resolve()
+    for forbidden in (aegis_dir, quarantine_dir):
+        if resolved == forbidden or forbidden in resolved.parents:
+            raise HTTPException(status_code=403, detail="Cannot quarantine AEGIS system files")
+
+    if not any(root == resolved.parent or root in resolved.parents for root in roots):
+        raise HTTPException(
+            status_code=403,
+            detail="Path is outside the configured quarantine roots",
+        )
+
+    try:
+        size = resolved.stat().st_size
+    except OSError:
+        raise HTTPException(status_code=404, detail=f"File not found: {raw_path}")
+    max_bytes = int(getattr(settings, "AEGIS_QUARANTINE_MAX_BYTES", 104857600))
+    if size > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File is larger than the {max_bytes} byte quarantine limit",
+        )
+    if size == 0:
+        raise HTTPException(status_code=400, detail="Empty files cannot be quarantined")
+
+    return resolved
+
+
 @router.post("/quarantine-file")
 async def quarantine_file(
     body: QuarantineFileRequest,
     auth: AuthContext = Depends(require_admin),
 ):
-    """Move a file to quarantine with XOR obfuscation. Admin only."""
-    file_path = Path(body.path)
+    """Move a file into quarantine after integrity verification.
 
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {body.path}")
-    if not file_path.is_file():
-        raise HTTPException(status_code=400, detail="Path is not a file")
+    Safety properties:
+      * only paths under AEGIS_QUARANTINE_ROOTS (empty = disabled);
+      * absolute, non-symlink, regular files only;
+      * caller must supply the file's SHA-256 and explicit confirmation;
+      * AEGIS's own files and the quarantine directory are never touched;
+      * the copy is fsynced before the original is unlinked.
+    """
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Confirmation required to quarantine a file")
 
-    # Prevent quarantining AEGIS's own files
-    aegis_dir = Path(__file__).resolve().parent.parent
-    if aegis_dir in file_path.resolve().parents:
-        raise HTTPException(status_code=403, detail="Cannot quarantine AEGIS system files")
+    expected = (body.expected_sha256 or "").strip().lower()
+    if len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
+        raise HTTPException(status_code=400, detail="expected_sha256 must be a 64-char hex digest")
 
-    QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
+    file_path = _resolve_quarantinable_file(body.path)
+
+    try:
+        raw = file_path.read_bytes()
+    except PermissionError:
+        raise HTTPException(status_code=403, detail=f"Permission denied: {body.path}")
+
+    actual = hashlib.sha256(raw).hexdigest()
+    if actual != expected:
+        raise HTTPException(
+            status_code=409,
+            detail="File hash does not match expected_sha256 (file changed since inspection)",
+        )
+
+    QUARANTINE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     quarantine_name = f"{ts}_{file_path.name}.quarantine"
     quarantine_path = QUARANTINE_DIR / quarantine_name
 
     try:
-        # Read, XOR-obfuscate, write to quarantine
-        raw = file_path.read_bytes()
+        # Read, XOR-obfuscate (prevents accidental execution), write atomically.
         obfuscated = bytes(b ^ XOR_KEY for b in raw)
-        quarantine_path.write_bytes(obfuscated)
+        tmp_path = quarantine_path.with_suffix(".tmp")
+        with open(tmp_path, "wb") as fh:
+            fh.write(obfuscated)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, quarantine_path)
 
         # Write metadata sidecar
         meta_path = quarantine_path.with_suffix(".quarantine.meta")
-        import json as _json
-        meta_path.write_text(_json.dumps({
+        meta_path.write_text(json.dumps({
             "original_path": str(file_path),
             "original_size": len(raw),
+            "sha256": actual,
             "quarantined_at": datetime.utcnow().isoformat(),
             "quarantined_by": auth.user_id or auth.client_id,
             "xor_key": XOR_KEY,
         }, indent=2))
 
-        # Remove original
+        # Remove original only after the quarantine copy is durable.
         file_path.unlink()
 
         logger.warning(

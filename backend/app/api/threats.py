@@ -1,10 +1,13 @@
-from typing import Optional
+import secrets
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.core.auth import AuthContext, require_analyst, require_viewer
 from fastapi import Query
@@ -18,6 +21,32 @@ from app.core.mongo_client import is_connected as mongo_connected
 from app.services.ioc_validator import validate_ioc, IOCValidationError
 
 router = APIRouter(prefix="/threats", tags=["threats"])
+
+
+def _require_hub_secret(supplied: Optional[str]) -> None:
+    """Authenticate node-to-hub writes.
+
+    When AEGIS_HUB_SHARED_SECRET is configured, the header must match in
+    constant time. When it is unset, writes are refused in production (the
+    deployment must opt in explicitly) and tolerated in development so local
+    node testing keeps working.
+    """
+    expected = (settings.AEGIS_HUB_SHARED_SECRET or "").strip()
+    if expected:
+        if not supplied or not secrets.compare_digest(str(supplied), expected):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or missing X-AEGIS-Hub-Secret header",
+            )
+        return
+    if settings.AEGIS_ENV == "production":
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Threat-sharing writes are disabled. Set AEGIS_HUB_SHARED_SECRET "
+                "and send it as X-AEGIS-Hub-Secret."
+            ),
+        )
 
 
 # --- Schemas ---
@@ -173,14 +202,18 @@ class SharedIOCSubmit(BaseModel):
 
 
 @router.post("/intel/share")
-async def share_ioc_public(body: SharedIOCSubmit):
+async def share_ioc_public(
+    body: SharedIOCSubmit,
+    x_aegis_hub_secret: Optional[str] = Header(None, alias="X-AEGIS-Hub-Secret"),
+):
     """
-    Public IOC sharing endpoint -- remote AEGIS nodes submit IOCs here.
+    IOC sharing endpoint -- remote AEGIS nodes submit IOCs here.
 
-    No authentication required so that any AEGIS node configured with
-    the hub URL can contribute threat intelligence.
+    Authenticated with the hub shared secret (AEGIS_HUB_SHARED_SECRET). The old
+    open endpoint let anybody poison the shared intel database.
     Validates IOCs before accepting to prevent poisoning.
     """
+    _require_hub_secret(x_aegis_hub_secret)
     # Validate IOC to prevent poisoning
     try:
         validated = validate_ioc(
@@ -229,13 +262,15 @@ async def share_ioc_public(body: SharedIOCSubmit):
 async def search_iocs_public(
     q: str,
     request: Request = None,
+    x_aegis_hub_secret: Optional[str] = Header(None, alias="X-AEGIS-Hub-Secret"),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Search IOCs by value or type -- public endpoint for node queries.
+    Search IOCs by value or type -- node/hub endpoint.
 
-    No authentication required so remote nodes can query the hub.
+    Requires X-AEGIS-Hub-Secret (or AEGIS_HUB_SHARED_SECRET unset in dev).
     """
+    _require_hub_secret(x_aegis_hub_secret)
     result = await db.execute(
         select(ThreatIntel).where(
             or_(
@@ -300,24 +335,44 @@ async def hub_info():
 # Sharing node registration (separate from EDR node enrollment)
 # ---------------------------------------------------------------------------
 
-# In-memory registry of sharing nodes (lightweight -- no DB required)
+# In-memory registry of sharing nodes (lightweight -- no DB required).
+# Bounded so unauthenticated/authenticated spam cannot exhaust memory.
+_MAX_SHARING_NODES = 1000
 _sharing_nodes: dict[str, dict] = {}
 
 
 class SharingNodeRegister(BaseModel):
-    node_id: str = Field(..., description="Unique node identifier")
-    node_name: str = Field("", description="Human-readable name")
-    node_url: str = Field("", description="Node's own API URL (for bidirectional sharing)")
-    version: str = Field("1.0.0", description="AEGIS version running on the node")
+    node_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    node_name: str = Field("", max_length=200)
+    node_url: str = Field("", max_length=500)
+    version: str = Field("1.0.0", max_length=32)
 
 
 @router.post("/nodes/register")
-async def register_sharing_node(body: SharingNodeRegister):
+async def register_sharing_node(
+    body: SharingNodeRegister,
+    x_aegis_hub_secret: Optional[str] = Header(None, alias="X-AEGIS-Hub-Secret"),
+):
     """
     Register a remote AEGIS node for threat sharing.
 
-    No authentication required -- any AEGIS instance can register.
+    Requires X-AEGIS-Hub-Secret. The registry is capped and evicts the oldest
+    entry once full.
     """
+    _require_hub_secret(x_aegis_hub_secret)
+
+    if body.node_url:
+        from app.core.ssrf import validate_outbound_url
+
+        try:
+            validate_outbound_url(body.node_url, require_https=True)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid node_url: {exc}")
+
+    if len(_sharing_nodes) >= _MAX_SHARING_NODES and body.node_id not in _sharing_nodes:
+        oldest = next(iter(_sharing_nodes))
+        _sharing_nodes.pop(oldest, None)
+
     _sharing_nodes[body.node_id] = {
         "node_id": body.node_id,
         "node_name": body.node_name or body.node_id,
@@ -349,8 +404,8 @@ async def register_sharing_node(body: SharingNodeRegister):
 
 
 @router.get("/nodes")
-async def list_sharing_nodes():
-    """List all registered sharing nodes. Public endpoint."""
+async def list_sharing_nodes(auth: AuthContext = Depends(require_viewer)):
+    """List all registered sharing nodes. Tenant admins only."""
     return {
         "nodes": list(_sharing_nodes.values()),
         "count": len(_sharing_nodes),
@@ -358,7 +413,7 @@ async def list_sharing_nodes():
 
 
 @router.get("/sharing/stats")
-async def get_sharing_stats():
+async def get_sharing_stats(auth: AuthContext = Depends(require_viewer)):
     """Get threat sharing statistics (hub sync + auto-sharer)."""
     from app.services.hub_sync_client import hub_sync_client
     from app.services.auto_sharer import auto_sharer

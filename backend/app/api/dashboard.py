@@ -689,7 +689,11 @@ async def get_threat_map(
         .order_by(func.count(Incident.id).desc())
         .limit(limit_per_source)
     )
-    hp_result, inc_result = await asyncio.gather(db.execute(hp_q), db.execute(inc_q))
+    # One AsyncSession is not safe for concurrent execute() calls (it raises
+    # InvalidRequestError / "this session is provisioning a new connection").
+    # Run the two aggregate queries sequentially.
+    hp_result = await db.execute(hp_q)
+    inc_result = await db.execute(inc_q)
 
     # Aggregate count per IP (combine both sources)
     ip_counts: dict[str, int] = {}

@@ -11,15 +11,17 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 
+from app.core.rate_limit import client_ip_key
+
+from app.config import settings
 from app.database import get_db
 from app.core.auth import generate_api_key, hash_password, create_user_jwt_token
 from app.core.audit import log_audit
 from app.models.client import Client
 from app.models.user import User, UserRole
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip_key)
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -71,6 +73,15 @@ def _make_slug(name: str) -> str:
 @limiter.limit("5/minute")
 async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depends(get_db)):
     """Create a new organization (Client) + admin User. Returns JWT."""
+
+    if not settings.AEGIS_ALLOW_SIGNUP:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Self-service signup is disabled on this deployment. "
+                "An administrator can create accounts from the dashboard."
+            ),
+        )
 
     email_lower = body.admin_email.lower()
 

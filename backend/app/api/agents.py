@@ -15,13 +15,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+
+from app.core.rate_limit import client_ip_key
 
 from app.database import get_db
 from app.core.auth import AuthContext, require_analyst, require_viewer, get_auth_context
 from app.core.events import event_bus
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip_key)
 from app.models.endpoint_agent import (
     EndpointAgent, AgentEvent, ForensicSnapshot,
     AgentStatus, EventSeverity, EventCategory,

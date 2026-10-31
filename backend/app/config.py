@@ -11,6 +11,26 @@ class Settings(BaseSettings):
     AEGIS_ADMIN_PASSWORD: str = "changeme-on-first-login"
     AEGIS_API_PORT: int = 8000
 
+    # --- Public demo -------------------------------------------------------
+    # The hosted demo intentionally publishes its admin login + API key. When
+    # demo mode is on, that identity is confined to a read-only sandbox (see
+    # app.core.demo). Self-hosted deployments should leave this off.
+    AEGIS_DEMO_MODE: bool = False
+    # Defence in depth: this is the one API key that is public in the repo and
+    # in the hosted dashboard. It is *always* sandboxed, even if demo mode was
+    # left off by mistake, because anybody on the internet knows it.
+    AEGIS_PUBLIC_DEMO_API_KEY: str = "c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ"
+    # Master switch for the request sandbox. Do not disable on a public host.
+    AEGIS_DEMO_SANDBOX: bool = True
+
+    # Open self-service signup. Off by default so a public demo/host cannot be
+    # used to create unlimited tenants (each signup also creates an admin).
+    AEGIS_ALLOW_SIGNUP: bool = False
+
+    # Shared secret expected by the threat-sharing hub write endpoints. When
+    # empty, remote writes are rejected in production and accepted in dev.
+    AEGIS_HUB_SHARED_SECRET: str = ""
+
     # AI Mode & Local Ollama
     AEGIS_AI_MODE: str = "local"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
@@ -102,6 +122,24 @@ class Settings(BaseSettings):
     # When set, AEGIS uses this for real iptables blocking + threat intel.
     AEGIS_FIREWALL_URL: str = ""
 
+    # Shared secret for the Mac Pro <-> firewall agent channel. Must match the
+    # value configured on the agent (X-AEGIS-FW-Auth header). Declared here so
+    # values loaded from .env by pydantic are actually visible to the client
+    # (os.environ alone does not carry .env values).
+    AEGIS_FIREWALL_SECRET: str = ""
+
+    # Filesystem roots from which /edr/quarantine-file may move files. Empty =
+    # endpoint disabled (the safe default). Comma-separated absolute paths.
+    AEGIS_QUARANTINE_ROOTS: str = ""
+    AEGIS_QUARANTINE_MAX_BYTES: int = 104857600  # 100 MB
+
+    # Verify TLS certificates for database connections (MySQL/TiDB). Never
+    # disable on a network you do not control.
+    AEGIS_DB_SSL_VERIFY: bool = True
+
+    # Seconds a new /ws connection has to send its first auth message.
+    AEGIS_WS_AUTH_TIMEOUT: float = 10.0
+
     # Opt-in incident reconciliation: when enabled, the firewall sync pass will
     # auto-resolve incidents whose source_ip is no longer in the Pi blocklist.
     # Set to True (or AEGIS_AUTO_RECONCILE_INCIDENTS=1 in .env) to activate.
@@ -158,9 +196,13 @@ class Settings(BaseSettings):
     AEGIS_DOS_EVENT_COOLDOWN: int = 30        # min seconds between same (ip,reason) event
 
     # Direct-peer IPs from which X-Forwarded-For is trusted for client-IP
-    # derivation. Default = localhost + Tailscale CGNAT. Any other peer uses the
-    # real socket IP, defeating XFF spoofing of rate-limit accounting.
-    AEGIS_DOS_TRUSTED_PROXIES: str = "127.0.0.1,::1,100.64.0.0/10"
+    # derivation. Default = loopback + RFC1918 (Docker/Render/Cloudflare
+    # proxies all connect from private ranges). Any other peer uses the real
+    # socket IP, defeating XFF spoofing of rate-limit accounting.
+    AEGIS_DOS_TRUSTED_PROXIES: str = (
+        "127.0.0.1,::1,100.64.0.0/10,"
+        "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    )
 
     # --- Network tier (gated by AEGIS_DOS_NETSHIELD) ---
     AEGIS_DOS_NETSHIELD_SYN_RATE: int = 50    # per-source SYN pkts/sec (iptables hashlimit)

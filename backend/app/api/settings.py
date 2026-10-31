@@ -1,12 +1,14 @@
+import re
 import time
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.core.ssrf import validate_outbound_url
 from app.database import get_db
 from app.core.auth import AuthContext, require_admin, require_viewer
 from app.core.audit import log_audit
@@ -223,7 +225,12 @@ async def update_notifications(
     client = auth.client
     current_settings = dict(client.settings or {})
     if body.webhook_url is not None:
-        current_settings["webhook_url"] = body.webhook_url
+        if body.webhook_url.strip():
+            try:
+                validate_outbound_url(body.webhook_url)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid webhook_url: {exc}")
+        current_settings["webhook_url"] = body.webhook_url.strip()
     if body.webhook_format is not None:
         current_settings["webhook_format"] = body.webhook_format
     if body.email_enabled is not None:
@@ -243,7 +250,10 @@ async def update_notifications(
     if body.telegram_enabled is not None:
         current_settings["telegram_enabled"] = body.telegram_enabled
     if body.telegram_bot_token is not None:
-        current_settings["telegram_bot_token"] = body.telegram_bot_token
+        token = body.telegram_bot_token.strip()
+        if token and not re.fullmatch(r"\d{5,20}:[A-Za-z0-9_-]{20,}", token):
+            raise HTTPException(status_code=400, detail="Invalid Telegram bot token format")
+        current_settings["telegram_bot_token"] = token
     if body.telegram_chat_id is not None:
         current_settings["telegram_chat_id"] = body.telegram_chat_id
     client.settings = current_settings
@@ -316,6 +326,8 @@ async def test_notification(
         chat_id = settings.get("telegram_chat_id", "")
         if not bot_token or not chat_id:
             return {"success": False, "message": "Telegram bot token and chat ID are required"}
+        if not re.fullmatch(r"\d{5,20}:[A-Za-z0-9_-]{20,}", str(bot_token)):
+            return {"success": False, "message": "Telegram bot token has an invalid format"}
         import httpx
         try:
             async with httpx.AsyncClient(timeout=10) as http:
@@ -333,6 +345,10 @@ async def test_notification(
         webhook_url = settings.get("webhook_url", "")
         if not webhook_url:
             return {"success": False, "message": "No webhook URL configured"}
+        try:
+            validate_outbound_url(webhook_url)
+        except ValueError as exc:
+            return {"success": False, "message": f"Webhook URL rejected: {exc}"}
         import httpx
         try:
             async with httpx.AsyncClient(timeout=10) as http:

@@ -23,8 +23,13 @@ elif _is_mysql:
     if "tidbcloud" in settings.DATABASE_URL or "ssl" in settings.DATABASE_URL.lower():
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        if not settings.AEGIS_DB_SSL_VERIFY:
+            # Explicit opt-out only for throwaway local databases.
+            logger.warning(
+                "AEGIS_DB_SSL_VERIFY=false: MySQL TLS certificate validation disabled"
+            )
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
         connect_args["ssl"] = ctx
     engine = create_async_engine(
         settings.DATABASE_URL,

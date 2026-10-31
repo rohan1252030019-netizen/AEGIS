@@ -8,11 +8,25 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      # Generated once by Render and kept in the service environment.
       - key: AEGIS_SECRET_KEY
         generateValue: true
-      - key: AEGIS_API_KEY
-        value: "c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ"
       - key: AEGIS_ENV
-        value: "development"
+        value: "production"
+      # Public demo: the published admin login is allowed and the demo tenant
+      # is confined to the read-only sandbox. Do NOT copy this block to a real
+      # deployment.
+      - key: AEGIS_DEMO_MODE
+        value: "true"
+      - key: AEGIS_DEMO_SANDBOX
+        value: "true"
+      - key: AEGIS_PUBLIC_DEMO_API_KEY
+        value: "c6_vOoMiwHmU50GfuPUMp5G2doB0eXZaslXfpSAof7tBgQ"
+      - key: AEGIS_ADMIN_PASSWORD
+        value: "admin123456"
+      - key: AEGIS_ALLOW_SIGNUP
+        value: "false"
+      - key: AEGIS_CORS_ORIGINS
+        sync: false
       - key: PYTHON_VERSION
         value: "3.11.9"

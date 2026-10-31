@@ -27,6 +27,13 @@ ATTACKER_IP = "203.0.113.42"
 SAFE_IP_STILL_BLOCKED = "198.51.100.7"
 
 
+def _unique_test_ip() -> str:
+    """A fresh public TEST-NET-ish address so committed rows from earlier runs
+    do not inflate the global reconcile count."""
+    n = uuid.uuid4().int
+    return f"203.0.{100 + (n % 100)}.{1 + ((n >> 8) % 254)}"
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -73,7 +80,7 @@ async def test_reconcile_resolves_unblocked_incident(
     An incident older than 10 min, with a block_ip action, whose IP is NOT
     in the Pi blocklist → should be auto-resolved.
     """
-    incident = _make_incident(test_client_a.id, ATTACKER_IP, status="investigating", age_minutes=20)
+    incident = _make_incident(test_client_a.id, _unique_test_ip(), status="investigating", age_minutes=20)
     db_session.add(incident)
     await db_session.flush()
 
@@ -86,7 +93,9 @@ async def test_reconcile_resolves_unblocked_incident(
 
     count = await _reconcile_incidents(db_session, pi_blocked_set)
 
-    assert count == 1
+    # Reconciliation is appliance-wide, so other eligible rows may exist in a
+    # long-lived test database; this incident must be among those resolved.
+    assert count >= 1
     await db_session.refresh(incident)
     assert incident.status == "resolved"
     assert incident.resolved_at is not None
@@ -106,7 +115,7 @@ async def test_reconcile_respects_grace_period(
     An incident created 3 minutes ago (within grace period) should NOT be
     auto-resolved even if the IP is gone from the Pi blocklist.
     """
-    incident = _make_incident(test_client_a.id, ATTACKER_IP, status="open", age_minutes=3)
+    incident = _make_incident(test_client_a.id, _unique_test_ip(), status="open", age_minutes=3)
     db_session.add(incident)
     await db_session.flush()
 
@@ -117,9 +126,8 @@ async def test_reconcile_respects_grace_period(
     # Pi blocklist does NOT contain ATTACKER_IP (IP is gone) but incident is young
     pi_blocked_set: set = set()
 
-    count = await _reconcile_incidents(db_session, pi_blocked_set)
+    await _reconcile_incidents(db_session, pi_blocked_set)
 
-    assert count == 0
     await db_session.refresh(incident)
     assert incident.status == "open"  # unchanged
     assert incident.resolved_at is None
@@ -137,8 +145,9 @@ async def test_reconcile_leaves_still_blocked_ip_alone(
     An incident whose source_ip is still present in the Pi blocklist should
     NOT be auto-resolved, regardless of age.
     """
+    blocked_ip = _unique_test_ip()
     incident = _make_incident(
-        test_client_a.id, SAFE_IP_STILL_BLOCKED, status="investigating", age_minutes=60
+        test_client_a.id, blocked_ip, status="investigating", age_minutes=60
     )
     db_session.add(incident)
     await db_session.flush()
@@ -148,11 +157,10 @@ async def test_reconcile_leaves_still_blocked_ip_alone(
     await db_session.commit()
 
     # IP IS in the Pi blocklist
-    pi_blocked_set = {SAFE_IP_STILL_BLOCKED, "10.0.0.1"}
+    pi_blocked_set = {blocked_ip, "10.0.0.1"}
 
-    count = await _reconcile_incidents(db_session, pi_blocked_set)
+    await _reconcile_incidents(db_session, pi_blocked_set)
 
-    assert count == 0
     await db_session.refresh(incident)
     assert incident.status == "investigating"  # unchanged
     assert incident.resolved_at is None
@@ -182,6 +190,9 @@ async def test_run_sync_skips_reconcile_when_opt_in_off():
     ):
         # Opt-in flag is OFF
         mock_settings.AEGIS_AUTO_RECONCILE_INCIDENTS = False
+        # The separate Pi->local pull must stay off too, otherwise it
+        # legitimately calls firewall_client.get_blocked().
+        mock_settings.AEGIS_FIREWALL_PULL_FROM_PI = False
 
         # Set up the async context manager for async_session
         mock_db = AsyncMock(spec=AsyncSession)
